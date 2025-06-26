@@ -24,24 +24,32 @@ const Navbar: React.FC = () => {
 
   const [newOrdersCount, setNewOrdersCount] = useState(0);
   const [newDeliveryMenCount, setNewDeliveryMenCount] = useState(0);
+  const [deliveryNotificationsCount, setDeliveryNotificationsCount] = useState(0);
 
   useEffect(() => {
-    const fetchAdminNotifications = async () => {
-      if (isAuthenticated && user?.role === 'admin') {
+    const fetchNotifications = async () => {
+      if (isAuthenticated) {
         try {
-          // Fetch pending orders
-          const ordersRes = await apiService.getAllOrders();
-          const pendingOrders = (ordersRes.orders || ordersRes.data || []).filter(order => order.status === 'pending');
-          setNewOrdersCount(pendingOrders.length);
-          // Fetch pending delivery men
-          const deliveryMenRes = await apiService.getPendingDeliveryMen();
-          setNewDeliveryMenCount((deliveryMenRes.pending || deliveryMenRes.data || []).length);
+          if (user?.role === 'admin') {
+            // Fetch pending orders
+            const ordersRes = await apiService.getAllOrders();
+            const pendingOrders = (ordersRes.orders || ordersRes.data || []).filter(order => order.status === 'pending');
+            setNewOrdersCount(pendingOrders.length);
+            // Fetch pending delivery men
+            const deliveryMenRes = await apiService.getPendingDeliveryMen();
+            setNewDeliveryMenCount((deliveryMenRes.pending || deliveryMenRes.data || []).length);
+          } else if (user?.role === 'delivery') {
+            // Fetch delivery notifications
+            const notificationsRes = await apiService.getDeliveryNotifications();
+            const notifications = notificationsRes.notifications || notificationsRes.data || [];
+            setDeliveryNotificationsCount(notifications.length);
+          }
         } catch (err) {
           // Optionally handle error
         }
       }
     };
-    fetchAdminNotifications();
+    fetchNotifications();
   }, [isAuthenticated, user]);
 
   const handleLogout = () => {
@@ -80,16 +88,18 @@ const Navbar: React.FC = () => {
 
             {isAuthenticated && (
               <>
-                <Link
-                  to="/dashboard"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/dashboard') 
-                      ? 'text-italian-green-700 bg-italian-green-50' 
-                      : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
-                  }`}
-                >
-                  Dashboard
-                </Link>
+                {user?.role === 'delivery' && (
+                  <Link
+                    to="/dashboard"
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive('/dashboard') 
+                        ? 'text-italian-green-700 bg-italian-green-50' 
+                        : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
+                    }`}
+                  >
+                    Dashboard
+                  </Link>
+                )}
                 {user?.role === 'admin' && (
                   <>
                     <Link to="/admin/feedbacks" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/feedbacks') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
@@ -128,6 +138,9 @@ const Navbar: React.FC = () => {
                   >
                     <Truck className="h-4 w-4" />
                     <span>Delivery</span>
+                    {deliveryNotificationsCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white">{deliveryNotificationsCount}</span>
+                    )}
                   </Link>
                 )}
               </>
@@ -160,17 +173,19 @@ const Navbar: React.FC = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-white border shadow-lg">
-                  <DropdownMenuItem asChild>
-                    <Link to="/dashboard" className="flex items-center space-x-2 px-3 py-2">
-                      <User className="h-4 w-4" />
-                      <span>Dashboard</span>
-                    </Link>
-                  </DropdownMenuItem>
+                  {user?.role === 'delivery' && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard" className="flex items-center space-x-2 px-3 py-2">
+                        <User className="h-4 w-4" />
+                        <span>Dashboard</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   {user?.role === 'delivery' && (
                     <DropdownMenuItem asChild>
                       <Link to="/delivery" className="flex items-center space-x-2 px-3 py-2">
                         <Truck className="h-4 w-4" />
-                        <span>Delivery Dashboard</span>
+                        <span>Delivery Management</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -215,20 +230,13 @@ const Navbar: React.FC = () => {
               </Link>
               {isAuthenticated && (
                 <>
-                  <Link
-                    to="/dashboard"
-                    className="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                  {user?.role === 'admin' && (
+                  {user?.role === 'delivery' && (
                     <Link
-                      to="/admin"
+                      to="/dashboard"
                       className="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
-                      Admin
+                      Dashboard
                     </Link>
                   )}
                   {user?.role === 'delivery' && (

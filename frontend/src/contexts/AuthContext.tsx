@@ -7,6 +7,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   register: (name: string, email: string, password: string, cf_password: string, address?: string) => Promise<boolean>;
   logout: () => void;
+  refreshUser: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
   loading: boolean;
@@ -88,12 +89,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('token');
   };
 
+  const refreshUser = () => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
     login,
     register,
     logout,
+    refreshUser,
     isAuthenticated: !!user && !!token,
     isAdmin: user?.role === 'admin',
     loading

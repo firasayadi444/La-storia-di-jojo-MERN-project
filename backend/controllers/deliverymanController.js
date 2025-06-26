@@ -1,18 +1,21 @@
 const Users = require('../models/userModel');
-const path = require('path');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
 const deliverymanController = {
+  // Submit new deliveryman application
   apply: async (req, res) => {
     try {
       const { name, email, phone, vehicleType } = req.body;
-      const vehiclePhoto = req.files['vehiclePhoto']?.[0]?.filename || '';
-      const facePhoto = req.files['facePhoto']?.[0]?.filename || '';
-      const cinPhoto = req.files['cinPhoto']?.[0]?.filename || '';
+      const vehiclePhoto = req.files?.vehiclePhoto?.[0]?.filename || '';
+      const facePhoto = req.files?.facePhoto?.[0]?.filename || '';
+      const cinPhoto = req.files?.cinPhoto?.[0]?.filename || '';
 
-      // Check if email already exists
+      if (!name || !email) {
+        return res.status(400).json({ message: 'Name and email are required.' });
+      }
+
       const existing = await Users.findOne({ email });
       if (existing) {
         return res.status(400).json({ message: 'Email already in use.' });
@@ -21,17 +24,19 @@ const deliverymanController = {
       const user = new Users({
         name,
         email,
-        phone,
+        phone: phone || '',
         role: 'delivery',
         status: 'pending',
-        vehicleType,
+        vehicleType: vehicleType || 'Not specified',
         vehiclePhoto,
         facePhoto,
         cinPhoto,
       });
+
       await user.save();
-      res.status(201).json({ message: 'Application submitted. You will be notified after acceptance.' });
+      res.status(201).json({ message: 'Application submitted successfully. You will be notified after acceptance.' });
     } catch (error) {
+      console.error('Deliveryman application error:', error);
       res.status(500).json({ message: error.message });
     }
   },
@@ -40,7 +45,7 @@ const deliverymanController = {
   listPending: async (req, res) => {
     try {
       const pending = await Users.find({ role: 'delivery', status: 'pending' });
-      res.json({ pending });
+      res.json({ message: "Pending applications retrieved successfully", data: pending });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
@@ -51,34 +56,58 @@ const deliverymanController = {
     try {
       const { id } = req.params;
       const user = await Users.findById(id);
+
       if (!user || user.role !== 'delivery' || user.status !== 'pending') {
         return res.status(404).json({ message: 'Application not found.' });
       }
-      // Generate random password
-      const password = crypto.randomBytes(8).toString('hex');
-      const hashed = await bcrypt.hash(password, 10);
-      user.password = hashed;
+
+      // Generate password and update status
+      const plainPassword = crypto.randomBytes(8).toString('hex');
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+      user.password = hashedPassword;
       user.status = 'active';
       user.mustChangePassword = true;
+
       await user.save();
-      // Send email with password
-      // (Configure your SMTP settings in .env or here)
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
+
+      // Send email if SMTP is configured
+      if (process.env.MAIL_USER && process.env.MAIL_PASSWORD) {
+        try {
+          const transporter = nodemailer.createTransport({
+            host: process.env.MAIL_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.MAIL_PORT || '587'),
+            secure: false,
+            auth: {
+              user: process.env.MAIL_USER,
+              pass: process.env.MAIL_PASSWORD,
+            },
+          });
+
+          await transporter.sendMail({
+            from: `"Food Delivery App" <${process.env.MAIL_USER}>`,
+            to: user.email,
+            subject: 'Delivery Man Application Approved',
+            text: `Hello ${user.name},\n\nYour delivery application has been approved!\n\nLogin Email: ${user.email}\nTemporary Password: ${plainPassword}\n\nPlease change your password after your first login.\n\nThank you.`,
+          });
+
+          console.log(`✅ Email sent to ${user.email}`);
+        } catch (emailError) {
+          console.error('❌ Failed to send email:', emailError);
+        }
+      } else {
+        console.log(`⚠️ SMTP not configured. Manual password for ${user.email}: ${plainPassword}`);
+      }
+
+      res.json({
+        message: 'Delivery man approved successfully.',
+        email: user.email,
+        password: plainPassword, // For admin manual notification
       });
-      await transporter.sendMail({
-        from: process.env.SMTP_USER,
-        to: user.email,
-        subject: 'Delivery Man Application Approved',
-        text: `Your application has been approved!\nLogin email: ${user.email}\nTemporary password: ${password}\nYou must change your password after first login.`
-      });
-      res.json({ message: 'Delivery man approved and notified by email.' });
+
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      console.error('❌ Approval error:', error);
+      res.status(500).json({ message: 'Internal server error.' });
     }
   },
 
@@ -87,40 +116,62 @@ const deliverymanController = {
     try {
       const { id } = req.params;
       const user = await Users.findById(id);
+
       if (!user || user.role !== 'delivery' || user.status !== 'pending') {
         return res.status(404).json({ message: 'Application not found.' });
       }
+
       user.status = 'rejected';
       await user.save();
+
       res.json({ message: 'Application rejected.' });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   },
 
-  // List all delivery men (any status)
+  // List all deliverymen
   listAll: async (req, res) => {
     try {
       const deliverymen = await Users.find({ role: 'delivery' });
-      res.json({ deliverymen });
+      res.json({ message: "All delivery men retrieved successfully", data: deliverymen });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   },
 
-  // Get a single delivery man by ID
+  // Get one delivery man by ID
   getById: async (req, res) => {
     try {
       const { id } = req.params;
       const user = await Users.findById(id);
+
       if (!user || user.role !== 'delivery') {
         return res.status(404).json({ message: 'Delivery man not found.' });
       }
-      res.json({ deliveryman: user });
+
+      res.json({ message: "Delivery man retrieved successfully", data: user });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  // Delete delivery man by ID
+  deleteById: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = await Users.findById(id);
+
+      if (!user || user.role !== 'delivery') {
+        return res.status(404).json({ message: 'Delivery man not found.' });
+      }
+
+      await user.deleteOne();
+      res.json({ message: 'Delivery man deleted successfully.' });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   },
 };
 
-module.exports = deliverymanController; 
+module.exports = deliverymanController;

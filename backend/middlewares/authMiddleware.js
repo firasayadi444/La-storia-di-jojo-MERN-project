@@ -1,6 +1,12 @@
 const Users = require("../models/userModel");
 const jwt = require("jsonwebtoken");
 
+// Set default JWT_SECRET if not provided
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = "default_jwt_secret_key_for_development";
+  console.log("No JWT_SECRET environment variable found, using default secret");
+}
+
 const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -19,6 +25,7 @@ const authMiddleware = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    console.error('Auth middleware error:', error);
     return res.status(401).json({ message: "Invalid Authentication." });
   }
 };
@@ -45,6 +52,7 @@ const adminAuthMiddleware = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    console.error('Admin auth middleware error:', error);
     return res.status(401).json({ message: "Invalid Authentication." });
   }
 };

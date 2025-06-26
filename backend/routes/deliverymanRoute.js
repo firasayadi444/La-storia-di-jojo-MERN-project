@@ -4,6 +4,11 @@ const multer = require('multer');
 const path = require('path');
 const deliverymanController = require('../controllers/deliverymanController');
 
+// Test route to check if deliverymanRoute is loaded
+router.get('/test', (req, res) => {
+  res.json({ message: 'Deliveryman route is working' });
+});
+
 // Multer setup for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -23,16 +28,22 @@ router.post('/apply', upload.fields([
   { name: 'cinPhoto', maxCount: 1 },
 ]), deliverymanController.apply);
 
-// List all pending deliveryman applications
+// List all pending deliveryman applications - SPECIFIC ROUTE FIRST
 router.get('/pending', deliverymanController.listPending);
+
+// GET /api/deliveryman/all - SPECIFIC ROUTE FIRST
+router.get('/all', deliverymanController.listAll);
+
 // Approve a deliveryman application
 router.post('/approve/:id', deliverymanController.approve);
+
 // Reject a deliveryman application
 router.post('/reject/:id', deliverymanController.reject);
 
-// GET /api/deliverymen/all
-router.get('/all', deliverymanController.listAll);
-// GET /api/deliverymen/:id
+// Delete a delivery man by ID (admin only)
+router.delete('/:id', deliverymanController.deleteById);
+
+// Get a single delivery man by ID - GENERIC ROUTE LAST
 router.get('/:id', deliverymanController.getById);
 
 module.exports = router; 

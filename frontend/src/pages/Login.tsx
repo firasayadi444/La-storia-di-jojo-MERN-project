@@ -22,11 +22,21 @@ const Login: React.FC = () => {
     try {
       const success = await login(email, password);
       if (success) {
-        toast({
-          title: "Welcome back!",
-          description: "You have successfully logged in.",
-        });
-        navigate('/');
+        // Check if user must change password
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        if (currentUser.mustChangePassword) {
+          toast({
+            title: "Welcome!",
+            description: "Please change your temporary password to continue.",
+          });
+          navigate('/change-password');
+        } else {
+          toast({
+            title: "Welcome back!",
+            description: "You have successfully logged in.",
+          });
+          navigate('/');
+        }
       } else {
         toast({
           title: "Login failed",

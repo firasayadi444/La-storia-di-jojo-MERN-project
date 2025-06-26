@@ -120,7 +120,8 @@ const seedDatabase = async () => {
       currentLocation: {
         type: "Point",
         coordinates: [12.4964, 41.9028] // Rome coordinates
-      }
+      },
+      status: "active"
     });
 
     const deliveryMan2 = await Users.create({
@@ -134,7 +135,8 @@ const seedDatabase = async () => {
       currentLocation: {
         type: "Point",
         coordinates: [12.4964, 41.9028] // Rome coordinates
-      }
+      },
+      status: "active"
     });
 
     const deliveryMan3 = await Users.create({
@@ -148,7 +150,39 @@ const seedDatabase = async () => {
       currentLocation: {
         type: "Point",
         coordinates: [12.4964, 41.9028] // Rome coordinates
-      }
+      },
+      status: "active"
+    });
+
+    // Add pending deliverymen
+    const pendingDeliveryMan1 = await Users.create({
+      name: "Luca Pending",
+      email: "luca@pending.com",
+      password: hashedPassword,
+      role: "delivery",
+      address: "111 Pending St, City",
+      phone: "+1234567895",
+      isAvailable: false,
+      currentLocation: {
+        type: "Point",
+        coordinates: [12.4964, 41.9028]
+      },
+      status: "pending"
+    });
+
+    const pendingDeliveryMan2 = await Users.create({
+      name: "Francesca Pending",
+      email: "francesca@pending.com",
+      password: hashedPassword,
+      role: "delivery",
+      address: "222 Pending Ave, City",
+      phone: "+1234567896",
+      isAvailable: false,
+      currentLocation: {
+        type: "Point",
+        coordinates: [12.4964, 41.9028]
+      },
+      status: "pending"
     });
 
     console.log("Database seeded successfully!");

@@ -44,15 +44,35 @@ const Register: React.FC = () => {
     if (formData.vehiclePhoto) fd.append('vehiclePhoto', formData.vehiclePhoto);
     if (formData.facePhoto) fd.append('facePhoto', formData.facePhoto);
     if (formData.cinPhoto) fd.append('cinPhoto', formData.cinPhoto);
+    
     // Call backend endpoint for delivery man application
     try {
-      await fetch('/api/deliveryman/apply', {
+      const response = await fetch('http://localhost:5000/api/deliveryman/apply', {
         method: 'POST',
         body: fd,
       });
-      setSubmitted(true);
+      
+      if (response.ok) {
+        const result = await response.json();
+        toast({
+          title: "Application submitted!",
+          description: result.message || "You will be notified after acceptance.",
+        });
+        setSubmitted(true);
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Application failed",
+          description: error.message || "An error occurred. Please try again.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
-      // handle error
+      toast({
+        title: "Application failed",
+        description: "An error occurred. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -142,20 +162,20 @@ const Register: React.FC = () => {
                     <Input id="phone" name="phone" type="text" value={formData.phone} onChange={handleChange} required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="vehicleType">Vehicle Type (bike/car)</Label>
-                    <Input id="vehicleType" name="vehicleType" type="text" value={formData.vehicleType} onChange={handleChange} required />
+                    <Label htmlFor="vehicleType">Vehicle Type (bike/car) - Optional</Label>
+                    <Input id="vehicleType" name="vehicleType" type="text" value={formData.vehicleType} onChange={handleChange} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Vehicle Photo</Label>
-                    <Input type="file" accept="image/*" required onChange={e => setFormData(prev => ({ ...prev, vehiclePhoto: e.target.files?.[0] || null }))} />
+                    <Label>Vehicle Photo - Optional</Label>
+                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, vehiclePhoto: e.target.files?.[0] || null }))} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Face Photo</Label>
-                    <Input type="file" accept="image/*" required onChange={e => setFormData(prev => ({ ...prev, facePhoto: e.target.files?.[0] || null }))} />
+                    <Label>Face Photo - Optional</Label>
+                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, facePhoto: e.target.files?.[0] || null }))} />
                   </div>
                   <div className="space-y-2">
-                    <Label>CIN Card Photo</Label>
-                    <Input type="file" accept="image/*" required onChange={e => setFormData(prev => ({ ...prev, cinPhoto: e.target.files?.[0] || null }))} />
+                    <Label>CIN Card Photo - Optional</Label>
+                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, cinPhoto: e.target.files?.[0] || null }))} />
                   </div>
                   <Button type="submit" className="w-full btn-gradient text-white py-3 text-lg font-semibold mt-6">Submit Application</Button>
                 </form>

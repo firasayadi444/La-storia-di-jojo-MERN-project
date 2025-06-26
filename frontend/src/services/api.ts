@@ -13,6 +13,12 @@ export interface User {
     type: string;
     coordinates: number[];
   };
+  status?: 'pending' | 'active' | 'rejected';
+  vehicleType?: string;
+  vehiclePhoto?: string;
+  facePhoto?: string;
+  cinPhoto?: string;
+  mustChangePassword?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -41,6 +47,7 @@ export interface Order {
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
   deliveryAddress: string;
   deliveryMan?: User;
+  deliveryEarnings?: number;
   estimatedDeliveryTime?: string;
   actualDeliveryTime?: string;
   deliveryNotes?: string;
@@ -118,6 +125,25 @@ class ApiService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(userData),
+    });
+    return handleResponse<void>(response);
+  }
+
+  async changePassword(passwordData: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }): Promise<ApiResponse<void>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(passwordData),
     });
     return handleResponse<void>(response);
   }
@@ -337,6 +363,71 @@ class ApiService {
       },
     });
     return handleResponse<Order[]>(response);
+  }
+
+  async getDeliveryNotifications(): Promise<ApiResponse<Order[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/delivery-notifications`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<Order[]>(response);
+  }
+
+  async getDeliveryHistory(): Promise<ApiResponse<Order[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/orders/delivery/history`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return handleResponse<Order[]>(response);
+  }
+
+  async getDeliveryEarnings(): Promise<ApiResponse<{
+    earningsHistory: Array<{
+      month: string;
+      monthKey: string;
+      totalEarnings: number;
+      orderCount: number;
+      orders: Array<{
+        _id: string;
+        orderNumber: string;
+        customerName: string;
+        totalAmount: number;
+        earnings: number;
+        deliveryDate: string;
+      }>;
+    }>;
+    totalEarnings: number;
+    totalOrders: number;
+    orders: Order[];
+  }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/orders/delivery/earnings`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return handleResponse<{
+      earningsHistory: Array<{
+        month: string;
+        monthKey: string;
+        totalEarnings: number;
+        orderCount: number;
+        orders: Array<{
+          _id: string;
+          orderNumber: string;
+          customerName: string;
+          totalAmount: number;
+          earnings: number;
+          deliveryDate: string;
+        }>;
+      }>;
+      totalEarnings: number;
+      totalOrders: number;
+      orders: Order[];
+    }>(response);
   }
 }
 

@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { apiService, Order } from '../services/api';
+import { apiService, Order, User } from '../services/api';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Clock, User as UserIcon, Truck, Package, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 const statusOptions = [
   'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'
@@ -8,8 +15,17 @@ const statusOptions = [
 
 const AdminOrders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [deliveryMen, setDeliveryMen] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [updateData, setUpdateData] = useState({
+    status: '',
+    deliveryManId: '',
+    estimatedDeliveryTime: '',
+    deliveryNotes: ''
+  });
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -23,59 +39,402 @@ const AdminOrders: React.FC = () => {
     }
   };
 
-  useEffect(() => { fetchOrders(); }, []);
-
-  const handleStatusChange = async (orderId: string, status: string) => {
-    setUpdating(orderId);
+  const fetchDeliveryMen = async () => {
     try {
-      await apiService.updateOrderStatus(orderId, { status });
+      const res = await apiService.getAvailableDeliveryMen();
+      setDeliveryMen(res.deliveryMen || res.data || []);
+    } catch (e) {
+      setDeliveryMen([]);
+    }
+  };
+
+  useEffect(() => { 
+    fetchOrders(); 
+    fetchDeliveryMen();
+  }, []);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'confirmed': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'preparing': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'ready': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'out_for_delivery': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending': return <Clock className="h-4 w-4" />;
+      case 'confirmed': return <AlertCircle className="h-4 w-4" />;
+      case 'preparing': return <Package className="h-4 w-4" />;
+      case 'ready': return <Package className="h-4 w-4" />;
+      case 'out_for_delivery': return <Truck className="h-4 w-4" />;
+      case 'delivered': return <CheckCircle className="h-4 w-4" />;
+      case 'cancelled': return <XCircle className="h-4 w-4" />;
+      default: return <AlertCircle className="h-4 w-4" />;
+    }
+  };
+
+  const isNewOrder = (order: Order) => {
+    const orderDate = new Date(order.createdAt);
+    const now = new Date();
+    const diffInHours = (now.getTime() - orderDate.getTime()) / (1000 * 60 * 60);
+    return diffInHours < 24; // New if less than 24 hours old
+  };
+
+  const sortedOrders = [...orders].sort((a, b) => {
+    // New orders first
+    if (isNewOrder(a) && !isNewOrder(b)) return -1;
+    if (!isNewOrder(a) && isNewOrder(b)) return 1;
+    // Then by creation date (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  const openUpdateDialog = (order: Order) => {
+    setSelectedOrder(order);
+    setUpdateData({
+      status: order.status,
+      deliveryManId: order.deliveryMan?._id || '',
+      estimatedDeliveryTime: '',
+      deliveryNotes: ''
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!selectedOrder) return;
+    
+    // Don't update if status hasn't changed and no other fields are being updated
+    if (updateData.status === selectedOrder.status && 
+        !updateData.deliveryManId && 
+        !updateData.estimatedDeliveryTime && 
+        !updateData.deliveryNotes) {
+      setIsDialogOpen(false);
+      return;
+    }
+    
+    setUpdating(selectedOrder._id);
+    try {
+      const updatePayload: any = { status: updateData.status };
+      
+      if (updateData.deliveryManId) {
+        updatePayload.deliveryManId = updateData.deliveryManId;
+      }
+      if (updateData.estimatedDeliveryTime) {
+        updatePayload.estimatedDeliveryTime = updateData.estimatedDeliveryTime;
+      }
+      if (updateData.deliveryNotes) {
+        updatePayload.deliveryNotes = updateData.deliveryNotes;
+      }
+
+      await apiService.updateOrderStatus(selectedOrder._id, updatePayload);
       fetchOrders();
-    } catch {}
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating order:', error);
+    }
     setUpdating(null);
   };
 
+  const getOrderStats = () => {
+    const stats = {
+      total: orders.length,
+      pending: orders.filter(o => o.status === 'pending').length,
+      preparing: orders.filter(o => o.status === 'preparing').length,
+      ready: orders.filter(o => o.status === 'ready').length,
+      delivered: orders.filter(o => o.status === 'delivered').length,
+      cancelled: orders.filter(o => o.status === 'cancelled').length,
+      new: orders.filter(o => isNewOrder(o)).length
+    };
+    return stats;
+  };
+
+  const stats = getOrderStats();
+
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-6">Orders Management</h1>
-      {loading ? <div>Loading...</div> : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border rounded shadow">
-            <thead>
-              <tr>
-                <th className="px-4 py-2 border">Order ID</th>
-                <th className="px-4 py-2 border">User</th>
-                <th className="px-4 py-2 border">Delivery Man</th>
-                <th className="px-4 py-2 border">Total</th>
-                <th className="px-4 py-2 border">Status</th>
-                <th className="px-4 py-2 border">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map(order => (
-                <tr key={order._id} className="border-b">
-                  <td className="px-4 py-2 border">{order._id.slice(-6)}</td>
-                  <td className="px-4 py-2 border">{order.user?.name}</td>
-                  <td className="px-4 py-2 border">{order.deliveryMan?.name || '-'}</td>
-                  <td className="px-4 py-2 border">€{order.totalAmount.toFixed(2)}</td>
-                  <td className="px-4 py-2 border capitalize">{order.status}</td>
-                  <td className="px-4 py-2 border space-x-2">
-                    <select
-                      value={order.status}
-                      onChange={e => handleStatusChange(order._id, e.target.value)}
-                      disabled={updating === order._id}
-                      className="border rounded px-2 py-1"
-                    >
-                      {statusOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="p-8 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Orders Management</h1>
+          <p className="text-gray-600">Manage and track all customer orders</p>
         </div>
-      )}
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-sm opacity-90">Total Orders</p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{stats.new}</p>
+                <p className="text-sm opacity-90">New Today</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{stats.pending}</p>
+                <p className="text-sm opacity-90">Pending</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{stats.ready}</p>
+                <p className="text-sm opacity-90">Ready</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{stats.preparing}</p>
+                <p className="text-sm opacity-90">Preparing</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{stats.delivered}</p>
+                <p className="text-sm opacity-90">Delivered</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{stats.cancelled}</p>
+                <p className="text-sm opacity-90">Cancelled</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Orders List */}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading orders...</p>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {sortedOrders.map(order => (
+              <Card 
+                key={order._id} 
+                className={`shadow-lg hover:shadow-xl transition-all duration-200 ${
+                  isNewOrder(order) ? 'border-l-4 border-yellow-500 bg-yellow-50' : ''
+                }`}
+              >
+                <CardContent className="p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Order #{order._id.slice(-6)}
+                        </h3>
+                        {isNewOrder(order) && (
+                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                            NEW
+                          </Badge>
+                        )}
+                        <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
+                          {getStatusIcon(order.status)}
+                          {order.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <UserIcon className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-600">{order.user?.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Truck className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-600">
+                            {order.deliveryMan?.name || 'Not assigned'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">
+                            €{order.totalAmount.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 text-sm text-gray-500">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          {new Date(order.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={() => openUpdateDialog(order)}
+                        disabled={updating === order._id}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {updating === order._id ? 'Updating...' : 'Update'}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {!loading && sortedOrders.length === 0 && (
+          <Card className="text-center py-12">
+            <CardContent>
+              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Orders Found</h3>
+              <p className="text-gray-600">There are no orders to display at the moment.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Order Status</DialogTitle>
+            <DialogDescription>
+              Update the order status and assign delivery details.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div>
+                <Label>Order ID: {selectedOrder._id.slice(-6)}</Label>
+              </div>
+              
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={updateData.status}
+                  onValueChange={(value) => setUpdateData(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map(opt => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {updateData.status === 'ready' && (
+                <div>
+                  <Label htmlFor="deliveryMan">Assign Delivery Man</Label>
+                  <Select
+                    value={updateData.deliveryManId}
+                    onValueChange={(value) => setUpdateData(prev => ({ ...prev, deliveryManId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select delivery man" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deliveryMen.map((deliveryMan) => (
+                        <SelectItem key={deliveryMan._id} value={deliveryMan._id}>
+                          {deliveryMan.name} {deliveryMan.phone && `(${deliveryMan.phone})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {updateData.status === 'out_for_delivery' && (
+                <>
+                  <div>
+                    <Label htmlFor="deliveryMan">Assign Delivery Man</Label>
+                    <Select
+                      value={updateData.deliveryManId}
+                      onValueChange={(value) => setUpdateData(prev => ({ ...prev, deliveryManId: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select delivery man" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {deliveryMen.map((deliveryMan) => (
+                          <SelectItem key={deliveryMan._id} value={deliveryMan._id}>
+                            {deliveryMan.name} {deliveryMan.phone && `(${deliveryMan.phone})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="estimatedTime">Estimated Delivery Time</Label>
+                    <Input
+                      id="estimatedTime"
+                      type="datetime-local"
+                      value={updateData.estimatedDeliveryTime}
+                      onChange={(e) => setUpdateData(prev => ({ 
+                        ...prev, 
+                        estimatedDeliveryTime: e.target.value 
+                      }))}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <Label htmlFor="notes">Delivery Notes</Label>
+                <Input
+                  id="notes"
+                  value={updateData.deliveryNotes}
+                  onChange={(e) => setUpdateData(prev => ({ 
+                    ...prev, 
+                    deliveryNotes: e.target.value 
+                  }))}
+                  placeholder="Optional delivery notes..."
+                />
+              </div>
+
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={handleUpdateOrder}
+                  disabled={updating === selectedOrder._id}
+                  className="flex-1"
+                >
+                  {updating === selectedOrder._id ? 'Updating...' : 'Update Order'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

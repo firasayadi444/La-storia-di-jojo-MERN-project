@@ -32,7 +32,11 @@ const foodController = {
   getAllFoods: async (req, res) => {
     try {
       const foods = await Foods.find({ available: true });
-      res.status(200).json({ foods });
+      res.status(200).json({ 
+        message: "Foods retrieved successfully",
+        data: foods,
+        foods: foods // Keep both for backward compatibility
+      });
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }
@@ -43,7 +47,11 @@ const foodController = {
       const food = await Foods.findById(req.params.id);
       if (!food)
         return res.status(400).json({ message: "This item does not exist" });
-      res.status(200).json({ food });
+      res.status(200).json({ 
+        message: "Food details retrieved successfully",
+        data: food,
+        food: food // Keep both for backward compatibility
+      });
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }
