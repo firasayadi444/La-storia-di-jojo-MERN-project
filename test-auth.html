@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Test</title>
+</head>
+<body>
+    <h1>Authentication Test</h1>
+    <div id="status"></div>
+    <button onclick="testAuth()">Test Authentication</button>
+    <button onclick="login()">Login as Admin</button>
+    <button onclick="checkToken()">Check Token</button>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML += '<p>' + message + '</p>';
+        }
+
+        function checkToken() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            updateStatus('Token: ' + (token ? token.substring(0, 20) + '...' : 'None'));
+            updateStatus('User: ' + (user ? JSON.parse(user).name : 'None'));
+        }
+
+        async function login() {
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@food.com',
+                        password: 'password'
+                    })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    updateStatus('Login successful: ' + data.user.name);
+                } else {
+                    updateStatus('Login failed: ' + data.message);
+                }
+            } catch (error) {
+                updateStatus('Login error: ' + error.message);
+            }
+        }
+
+        async function testAuth() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                updateStatus('No token found. Please login first.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/orders`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('Auth test successful. Found ' + data.orders.length + ' orders.');
+                } else {
+                    const data = await response.json();
+                    updateStatus('Auth test failed: ' + data.message + ' (Status: ' + response.status + ')');
+                }
+            } catch (error) {
+                updateStatus('Auth test error: ' + error.message);
+            }
+        }
+
+        // Check token on load
+        checkToken();
+    </script>
+</body>
+</html> 
