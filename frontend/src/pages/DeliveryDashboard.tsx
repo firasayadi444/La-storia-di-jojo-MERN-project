@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useAvailability } from '../contexts/AvailabilityContext';
 import { apiService, Order } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { 
   MapPin, 
@@ -21,18 +23,35 @@ import {
   XCircle,
   DollarSign,
   TrendingUp,
-  Calendar
+  Calendar,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 const DeliveryDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { isAvailable, updatingAvailability, updateAvailability } = useAvailability();
   const [orders, setOrders] = useState<Order[]>([]);
   const [notifications, setNotifications] = useState<Order[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const { toast } = useToast();
+
+  // Fix: Only show orders assigned to this delivery man and with correct status
+  const activeOrders = orders.filter(order =>
+    (order.status === 'ready' || order.status === 'out_for_delivery') &&
+    order.deliveryMan &&
+    ((typeof order.deliveryMan === 'string' && order.deliveryMan === user?._id) ||
+     (typeof order.deliveryMan === 'object' && order.deliveryMan._id === user?._id))
+  );
+
+  // Check if delivery man has active orders
+  const hasActiveOrders = orders.some(order => 
+    order.status === 'ready' || order.status === 'out_for_delivery'
+  );
 
   useEffect(() => {
     if (user?.role !== 'delivery') return;
@@ -40,18 +59,29 @@ const DeliveryDashboard: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [historyResponse, notificationsResponse] = await Promise.all([
-          apiService.getDeliveryHistory(),
-          apiService.getDeliveryNotifications()
+        const [activeOrdersResponse, notificationsResponse, historyResponse] = await Promise.all([
+          apiService.getDeliveryOrders(), // This gets active orders (ready, out_for_delivery)
+          apiService.getDeliveryNotifications(),
+          apiService.getDeliveryHistory() // This gets completed orders (delivered)
         ]);
-        if (historyResponse.orders) {
-          setOrders(historyResponse.orders);
-        } else if (historyResponse.data) {
-          setOrders(historyResponse.data);
+        
+        // Set active orders from getDeliveryOrders
+        if (activeOrdersResponse.orders) {
+          setOrders(activeOrdersResponse.orders);
+        } else if (activeOrdersResponse.data) {
+          setOrders(activeOrdersResponse.data);
         }
+        
+        // Set notifications
         if (notificationsResponse.data) {
           setNotifications(notificationsResponse.data);
         }
+        
+        // Store completed orders separately if needed
+        const completedOrders = historyResponse.orders || historyResponse.data || [];
+        console.log('Completed orders:', completedOrders.length);
+        setCompletedOrders(completedOrders);
+        
       } catch (error: any) {
         console.error('Error fetching delivery data:', error);
         toast({
@@ -69,6 +99,10 @@ const DeliveryDashboard: React.FC = () => {
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [user, toast]);
+
+  const handleAvailabilityToggle = async (checked: boolean) => {
+    await updateAvailability(checked);
+  };
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
@@ -92,9 +126,19 @@ const DeliveryDashboard: React.FC = () => {
       setSelectedOrder(null);
       setDeliveryNotes('');
       
+      // Show appropriate success message based on status
+      let successMessage = '';
+      if (newStatus === 'out_for_delivery') {
+        successMessage = 'Delivery started successfully! You are now on your way to deliver this order.';
+      } else if (newStatus === 'delivered') {
+        successMessage = 'Order delivered successfully! Thank you for completing this delivery.';
+      } else {
+        successMessage = `Order status updated to ${newStatus}`;
+      }
+      
       toast({
         title: "Success",
-        description: `Order status updated to ${newStatus}`,
+        description: successMessage,
       });
     } catch (error: any) {
       toast({
@@ -136,9 +180,6 @@ const DeliveryDashboard: React.FC = () => {
     );
   }
 
-  const activeOrders = orders.filter(order => order.status === 'ready' || order.status === 'out_for_delivery');
-  const completedOrders = orders.filter(order => order.status === 'delivered');
-
   // Earnings calculations (frontend only)
   const totalEarnings = completedOrders.reduce((sum, order) => sum + order.totalAmount * 0.15, 0);
   const totalDeliveries = completedOrders.length;
@@ -158,253 +199,198 @@ const DeliveryDashboard: React.FC = () => {
     .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
     .map(([monthKey, data]) => ({ monthKey, ...data }));
 
+  // This already includes 'out_for_delivery' orders in the Active Deliveries section.
+  // If you want to make sure, you can add a debug log:
+  console.log('Active Orders:', activeOrders.map(o => ({ id: o._id, status: o.status })));
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
+        {/* --- SECTION 1: Active Orders & Assignments --- */}
+        <div className="mb-12">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Delivery Management</h1>
-          <p className="text-gray-600">Manage your active deliveries and assignments</p>
-        </div>
-
-        {/* Notifications Section */}
-        {notifications.length > 0 && (
+          <p className="text-gray-600 mb-6">Manage your active deliveries and assignments</p>
+          
+          {/* Availability Toggle Section */}
           <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-              <Bell className="h-5 w-5 mr-2 text-blue-600" />
-              New Assignments ({notifications.length})
-            </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {notifications.slice(0, 4).map((notification) => (
-                <Card key={notification._id} className="border-l-4 border-blue-500 bg-blue-50 shadow-lg">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
-                          Order #{notification._id.slice(-6)}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          Customer: {notification.user?.name}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Address: {notification.deliveryAddress}
-                        </p>
-                        <p className="text-sm font-medium text-gray-900">
-                          €{notification.totalAmount.toFixed(2)}
-                        </p>
-                      </div>
-                      <Badge className="bg-blue-100 text-blue-800">
-                        {notification.status.replace('_', ' ')}
-                      </Badge>
+            <Card className="bg-gradient-to-r from-italian-green-50 to-italian-cream-50 border-italian-green-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    {isAvailable ? (
+                      <Wifi className="h-6 w-6 text-green-600" />
+                    ) : (
+                      <WifiOff className="h-6 w-6 text-red-600" />
+                    )}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {isAvailable ? 'Available for Deliveries' : 'Currently Unavailable'}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {isAvailable 
+                          ? 'You are currently accepting new delivery assignments'
+                          : 'You are not accepting new delivery assignments'
+                        }
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white/80 text-sm">Total Earnings</p>
-                  <p className="text-2xl font-bold">€{totalEarnings.toFixed(2)}</p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Switch
+                      checked={isAvailable}
+                      onCheckedChange={handleAvailabilityToggle}
+                      disabled={updatingAvailability || hasActiveOrders}
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      {updatingAvailability ? 'Updating...' : (isAvailable ? 'Available' : 'Unavailable')}
+                    </span>
+                  </div>
                 </div>
-                <DollarSign className="h-8 w-8 text-white/80" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white/80 text-sm">Total Deliveries</p>
-                  <p className="text-2xl font-bold">{totalDeliveries}</p>
-                </div>
-                <Truck className="h-8 w-8 text-white/80" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white/80 text-sm">Avg. Per Delivery</p>
-                  <p className="text-2xl font-bold">
-                    €{avgPerDelivery.toFixed(2)}
-                  </p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-white/80" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white/80 text-sm">Months Active</p>
-                  <p className="text-2xl font-bold">{monthlyEarnings.length}</p>
-                </div>
-                <Calendar className="h-8 w-8 text-white/80" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Monthly Earnings Table */}
-        {monthlyEarnings.length > 0 && (
-          <Card className="shadow-lg mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
-                Monthly Earnings History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deliveries</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Earnings</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Per Delivery</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {monthlyEarnings.map(month => (
-                      <tr key={month.monthKey} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {month.month}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {month.count}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                          €{month.total.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          €{(month.total / month.count).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Active Deliveries */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Active Deliveries</h2>
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading deliveries...</p>
-            </div>
-          ) : activeOrders.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {activeOrders.map((order) => (
-                <Card key={order._id} className="shadow-lg hover:shadow-xl transition-shadow">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center space-x-2">
-                          <span>Order #{order._id.slice(-6)}</span>
-                          <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
-                            {getStatusIcon(order.status)}
-                            <span className="ml-1">{order.status.replace('_', ' ')}</span>
-                          </Badge>
-                        </CardTitle>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {new Date(order.createdAt).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                      </div>
+                {hasActiveOrders && (
+                  <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm text-orange-800">
+                        You have active deliveries in progress. Complete your current deliveries before going unavailable.
+                      </span>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm font-medium">{order.user?.name}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm text-gray-600">{order.user?.phone || 'No phone'}</span>
-                      </div>
-                      <div className="flex items-start space-x-2">
-                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                        <span className="text-sm text-gray-600">{order.deliveryAddress}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-gray-900">
-                          Total: €{order.totalAmount.toFixed(2)}
-                        </span>
-                      </div>
-                      {order.estimatedDeliveryTime && (
-                        <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm text-gray-600">
-                            Est. Delivery: {new Date(order.estimatedDeliveryTime).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="mt-4 flex space-x-2">
-                      {order.status === 'ready' && (
-                        <Button
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setIsStatusDialogOpen(true);
-                          }}
-                          className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                        >
-                          <Truck className="h-4 w-4 mr-2" />
-                          Start Delivery
-                        </Button>
-                      )}
-                      {order.status === 'out_for_delivery' && (
-                        <Button
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setIsStatusDialogOpen(true);
-                          }}
-                          className="flex-1 bg-green-600 hover:bg-green-700"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Mark Delivered
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="text-center py-12">
-              <CardContent>
-                <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Deliveries</h3>
-                <p className="text-gray-600">You don't have any active delivery assignments at the moment.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
+          </div>
+
+          {/* Notifications Section */}
+          {notifications.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <Bell className="h-5 w-5 mr-2 text-blue-600" />
+                New Assignments ({notifications.length})
+              </h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {notifications.slice(0, 4).map((notification) => (
+                  <Card key={notification._id} className="border-l-4 border-blue-500 bg-blue-50 shadow-lg">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-gray-900">
+                            Order #{notification._id.slice(-6)}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            Customer: {notification.user?.name}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Address: {notification.deliveryAddress}
+                          </p>
+                          <p className="text-sm font-medium text-gray-900">
+                            €{notification.totalAmount.toFixed(2)}
+                          </p>
+                        </div>
+                        <Badge className="bg-blue-100 text-blue-800">
+                          {notification.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           )}
+          {/* Active Deliveries Section */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Active Deliveries</h2>
+            {activeOrders.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {activeOrders.map((order) => (
+                  <Card key={order._id} className="shadow-md">
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <span>Order #{order._id.slice(-6)}</span>
+                        <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
+                          {getStatusIcon(order.status)}
+                          <span className="ml-1">{order.status.replace('_', ' ')}</span>
+                        </Badge>
+                      </CardTitle>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {new Date(order.createdAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <User className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm font-medium">{order.user?.name}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Phone className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm text-gray-600">{order.user?.phone || 'No phone'}</span>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                          <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
+                          <span className="text-sm text-gray-600">{order.deliveryAddress}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-900">
+                            Total: €{order.totalAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        {order.estimatedDeliveryTime && (
+                          <div className="flex items-center space-x-2">
+                            <Clock className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm text-gray-600">
+                              Est. Delivery: {new Date(order.estimatedDeliveryTime).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4 flex space-x-2">
+                        {order.status === 'ready' && (
+                          <Button
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setIsStatusDialogOpen(true);
+                            }}
+                            className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                          >
+                            <Truck className="h-4 w-4 mr-2" />
+                            Start Delivery
+                          </Button>
+                        )}
+                        {order.status === 'out_for_delivery' && (
+                          <Button
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setIsStatusDialogOpen(true);
+                            }}
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Mark Delivered
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Active Deliveries</h3>
+                  <p className="text-gray-600">You don't have any active delivery assignments at the moment.</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
-        {/* Completed Deliveries */}
+        {/* Completed Deliveries Section (optional, can be moved or styled differently) */}
         {completedOrders.length > 0 && (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Completed Deliveries</h2>
@@ -479,13 +465,16 @@ const DeliveryDashboard: React.FC = () => {
               {selectedOrder.status === 'out_for_delivery' && (
                 <div>
                   <div className="mb-4">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Are you sure you want to mark this order as delivered?
+                    </p>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Delivery Notes (Optional)
                     </label>
                     <Textarea
                       value={deliveryNotes}
                       onChange={(e) => setDeliveryNotes(e.target.value)}
-                      placeholder="Add any delivery notes..."
+                      placeholder="Add any delivery notes, special instructions, or customer feedback..."
                       rows={3}
                     />
                   </div>
@@ -495,7 +484,7 @@ const DeliveryDashboard: React.FC = () => {
                       className="flex-1 bg-green-600 hover:bg-green-700"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Mark as Delivered
+                      Confirm Delivery
                     </Button>
                     <Button
                       variant="outline"

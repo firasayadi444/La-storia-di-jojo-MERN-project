@@ -1,10 +1,19 @@
 const Foods = require("../models/foodModel");
 const { addFoodErrorHandler } = require("../utils/errorHandler");
 
+// Helper function to construct full image URL
+const getImageUrl = (filename) => {
+  if (!filename) return null;
+  if (filename.startsWith('http')) return filename; // Already a full URL
+  return `${process.env.BASE_URL || 'http://localhost:5000'}/uploads/${filename}`;
+};
+
 const foodController = {
   addFood: async (req, res) => {
     try {
-      const { name, category, price, description, image, available } = req.body;
+      const { name, category, price, description, available } = req.body;
+      const image = req.file ? req.file.filename : null;
+      
       const errorMessage = addFoodErrorHandler(
         name,
         category,
@@ -23,7 +32,13 @@ const foodController = {
         available: available !== undefined ? available : true,
       }).save();
       
-      res.status(201).json({ message: "Successfully added new food", food });
+      // Convert image filename to full URL
+      const foodWithImageUrl = {
+        ...food.toObject(),
+        image: getImageUrl(food.image)
+      };
+      
+      res.status(201).json({ message: "Successfully added new food", food: foodWithImageUrl });
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }
@@ -32,10 +47,17 @@ const foodController = {
   getAllFoods: async (req, res) => {
     try {
       const foods = await Foods.find({ available: true });
+      
+      // Convert image filenames to full URLs
+      const foodsWithImageUrls = foods.map(food => ({
+        ...food.toObject(),
+        image: getImageUrl(food.image)
+      }));
+      
       res.status(200).json({ 
         message: "Foods retrieved successfully",
-        data: foods,
-        foods: foods // Keep both for backward compatibility
+        data: foodsWithImageUrls,
+        foods: foodsWithImageUrls // Keep both for backward compatibility
       });
     } catch (error) {
       return res.status(500).json({ message: error.message });
@@ -47,10 +69,17 @@ const foodController = {
       const food = await Foods.findById(req.params.id);
       if (!food)
         return res.status(400).json({ message: "This item does not exist" });
+      
+      // Convert image filename to full URL
+      const foodWithImageUrl = {
+        ...food.toObject(),
+        image: getImageUrl(food.image)
+      };
+      
       res.status(200).json({ 
         message: "Food details retrieved successfully",
-        data: food,
-        food: food // Keep both for backward compatibility
+        data: foodWithImageUrl,
+        food: foodWithImageUrl // Keep both for backward compatibility
       });
     } catch (error) {
       return res.status(500).json({ message: error.message });

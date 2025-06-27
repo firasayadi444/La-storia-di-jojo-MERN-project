@@ -1,4 +1,6 @@
+const mongoose = require("mongoose");
 const Users = require('../models/userModel');
+const Orders = require('../models/orderModel');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -168,6 +170,48 @@ const deliverymanController = {
 
       await user.deleteOne();
       res.json({ message: 'Delivery man deleted successfully.' });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  // Update delivery man availability
+  updateAvailability: async (req, res) => {
+    try {
+      const { isAvailable } = req.body;
+      const deliveryManId = req.user._id;
+
+      if (typeof isAvailable !== 'boolean') {
+        return res.status(400).json({ message: 'isAvailable must be a boolean value.' });
+      }
+
+      const user = await Users.findById(deliveryManId);
+      if (!user || user.role !== 'delivery') {
+        return res.status(404).json({ message: 'Delivery man not found.' });
+      }
+
+      // Check if delivery man is trying to go unavailable while having active orders
+      if (!isAvailable) {
+        const activeOrders = await Orders.find({
+          deliveryMan: deliveryManId,
+          status: { $in: ['ready', 'out_for_delivery'] }
+        });
+
+        if (activeOrders.length > 0) {
+          return res.status(400).json({ 
+            message: 'Cannot go unavailable while you have active deliveries. Please complete or cancel your current deliveries first.',
+            activeOrdersCount: activeOrders.length
+          });
+        }
+      }
+
+      user.isAvailable = isAvailable;
+      await user.save();
+
+      res.json({ 
+        message: `Availability updated successfully. You are now ${isAvailable ? 'available' : 'unavailable'}.`,
+        isAvailable: user.isAvailable
+      });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }

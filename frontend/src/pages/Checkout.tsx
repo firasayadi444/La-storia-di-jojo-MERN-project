@@ -30,17 +30,17 @@ const Checkout: React.FC = () => {
     return null;
   }
 
+  if (user?.role !== 'user') {
+    navigate('/');
+    return null;
+  }
+
   if (items.length === 0) {
     navigate('/cart');
     return null;
   }
 
   const total = getTotalPrice();
-
-  // Calculate discount for delivery role
-  const isDelivery = user?.role === 'delivery';
-  const discount = isDelivery ? 0.2 : 0;
-  const discountedTotal = total * (1 - discount);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setOrderData(prev => ({
@@ -61,7 +61,7 @@ const Checkout: React.FC = () => {
           quantity: item.quantity,
           price: item.food.price
         })),
-        totalAmount: discountedTotal,
+        totalAmount: total,
         deliveryAddress: orderData.address,
         paymentMethod
       };
@@ -74,10 +74,10 @@ const Checkout: React.FC = () => {
 
       toast({
         title: "Order placed successfully!",
-        description: `Your order for €${discountedTotal.toFixed(2)} has been confirmed.`,
+        description: `Your order for €${total.toFixed(2)} has been confirmed.`,
       });
 
-      navigate('/dashboard');
+      navigate('/orders');
     } catch (error: any) {
       toast({
         title: "Order failed",
@@ -200,9 +200,7 @@ const Checkout: React.FC = () => {
                 >
                   {isLoading
                     ? 'Placing Order...'
-                    : isDelivery
-                      ? `Place Order - €${discountedTotal.toFixed(2)} (20% Delivery Discount)`
-                      : `Place Order - €${total.toFixed(2)}`}
+                    : `Place Order - €${total.toFixed(2)}`}
                 </Button>
               </form>
             </CardContent>
@@ -238,15 +236,7 @@ const Checkout: React.FC = () => {
                 <div className="pt-4">
                   <div className="flex justify-between items-center text-lg font-bold">
                     <span>Total:</span>
-                    {isDelivery ? (
-                      <span className="text-food-orange-600">
-                        <span className="line-through mr-2 text-gray-400">€{total.toFixed(2)}</span>
-                        €{discountedTotal.toFixed(2)}
-                        <span className="ml-2 text-green-600 text-base font-semibold">(20% Delivery Discount)</span>
-                      </span>
-                    ) : (
-                      <span className="text-food-orange-600">€{total.toFixed(2)}</span>
-                    )}
+                    <span className="text-food-orange-600">€{total.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

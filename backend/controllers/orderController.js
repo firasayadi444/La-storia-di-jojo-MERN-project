@@ -113,21 +113,44 @@ const orderController = {
     try {
       const { status, deliveryManId, estimatedDeliveryTime, deliveryNotes } = req.body;
       const orderId = req.params.id;
+      const userId = req.user._id;
+      const userRole = req.user.role;
 
-      console.log('Updating order:', orderId, 'with data:', req.body); // Debug log
+      console.log('=== Order Status Update Request ===');
+      console.log('Order ID:', orderId);
+      console.log('User ID:', userId);
+      console.log('User Role:', userRole);
+      console.log('Request Body:', req.body);
+      console.log('Current User:', req.user);
 
       const order = await Orders.findById(orderId);
       if (!order) {
+        console.log('Order not found');
         return res.status(404).json({ message: "Order not found" });
       }
 
-      console.log('Current order status:', order.status); // Debug log
+      console.log('Current order status:', order.status);
+      console.log('Order delivery man:', order.deliveryMan);
+      console.log('Requested status:', status);
 
       // Check if status is actually changing
       if (status === order.status && !deliveryManId && !estimatedDeliveryTime && !deliveryNotes) {
+        console.log('No changes detected');
         return res.status(400).json({ 
           message: "No changes detected. Please update at least one field." 
         });
+      }
+
+      // For delivery men, check if they are assigned to this order
+      if (userRole === 'delivery') {
+        console.log('Checking delivery man permissions...');
+        if (!order.deliveryMan || String(order.deliveryMan) !== String(userId)) {
+          console.log('Delivery man not assigned to this order');
+          return res.status(403).json({ 
+            message: "You are not assigned to this order or the order is not assigned to any delivery man." 
+          });
+        }
+        console.log('Delivery man is authorized for this order');
       }
 
       // Validate status transition only if status is changing
@@ -142,8 +165,11 @@ const orderController = {
           cancelled: []
         };
 
+        console.log('Valid transitions for current status:', validTransitions[order.status]);
+
         // Check if current status exists in validTransitions
         if (!validTransitions[order.status]) {
+          console.log('Invalid current order status:', order.status);
           return res.status(400).json({ 
             message: `Invalid current order status: ${order.status}` 
           });
@@ -151,10 +177,13 @@ const orderController = {
 
         // Check if the transition is valid
         if (!validTransitions[order.status].includes(status)) {
+          console.log('Invalid status transition');
           return res.status(400).json({ 
             message: `Invalid status transition from ${order.status} to ${status}. Valid transitions: ${validTransitions[order.status].join(', ')}` 
           });
         }
+
+        console.log('Status transition is valid');
       }
 
       // Update order
@@ -164,6 +193,7 @@ const orderController = {
       // Only update status if it's different
       if (status !== order.status) {
         updateData.status = status;
+        console.log('Updating status to:', status);
       }
       
       if (deliveryManId && (status === 'out_for_delivery' || status === 'ready')) {
@@ -186,17 +216,15 @@ const orderController = {
 
       if (status === 'delivered') {
         updateData.actualDeliveryTime = new Date();
-        // Calculate 15% commission for delivery man
-        if (order.deliveryMan) {
-          updateData.deliveryEarnings = Math.round((order.totalAmount * 0.15) * 100) / 100; // 15% commission
-        }
+        console.log('Setting actual delivery time');
       }
 
       if (deliveryNotes) {
         updateData.deliveryNotes = deliveryNotes;
+        console.log('Adding delivery notes');
       }
 
-      console.log('Final update data:', updateData); // Debug log
+      console.log('Final update data:', updateData);
 
       const updatedOrder = await Orders.findByIdAndUpdate(
         orderId,
@@ -207,54 +235,14 @@ const orderController = {
         .populate('items.food', 'name price image category')
         .populate('deliveryMan', 'name phone email');
 
-      // Send notification to delivery man if assigned
-      if (status === 'out_for_delivery' && deliveryMan && process.env.SMTP_USER) {
-        try {
-          const transporter = nodemailer.createTransporter({
-            service: 'gmail',
-            auth: {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASS,
-            },
-          });
-
-          const orderItems = updatedOrder.items.map(item => 
-            `${item.food.name} x${item.quantity}`
-          ).join(', ');
-
-          await transporter.sendMail({
-            from: process.env.SMTP_USER,
-            to: deliveryMan.email,
-            subject: 'New Delivery Assignment - La Storia Di JoJo',
-            html: `
-              <h2>New Delivery Assignment</h2>
-              <p>Hello ${deliveryMan.name},</p>
-              <p>You have been assigned a new delivery order.</p>
-              <h3>Order Details:</h3>
-              <ul>
-                <li><strong>Order ID:</strong> ${updatedOrder._id.slice(-6)}</li>
-                <li><strong>Customer:</strong> ${updatedOrder.user.name}</li>
-                <li><strong>Delivery Address:</strong> ${updatedOrder.deliveryAddress}</li>
-                <li><strong>Items:</strong> ${orderItems}</li>
-                <li><strong>Total Amount:</strong> €${updatedOrder.totalAmount.toFixed(2)}</li>
-                ${updatedOrder.estimatedDeliveryTime ? `<li><strong>Estimated Delivery:</strong> ${new Date(updatedOrder.estimatedDeliveryTime).toLocaleString()}</li>` : ''}
-              </ul>
-              <p>Please check your delivery dashboard for more details.</p>
-              <p>Thank you!</p>
-            `
-          });
-          console.log(`Notification sent to delivery man: ${deliveryMan.email}`);
-        } catch (emailError) {
-          console.error('Failed to send delivery notification:', emailError);
-        }
-      }
+      console.log('Order updated successfully:', updatedOrder._id);
 
       res.status(200).json({
         message: "Order updated successfully",
         order: updatedOrder
       });
     } catch (error) {
-      console.error('Order status update error:', error); // Debug log
+      console.error('Order status update error:', error);
       return res.status(500).json({ message: error.message });
     }
   },
@@ -383,71 +371,6 @@ const orderController = {
         .populate('items.food', 'name price image category')
         .sort({ createdAt: -1 });
       res.status(200).json({ orders });
-    } catch (error) {
-      return res.status(500).json({ message: error.message });
-    }
-  },
-
-  // Get delivery man earnings history by month
-  getDeliveryEarnings: async (req, res) => {
-    try {
-      const deliveryManId = req.user._id;
-      const orders = await Orders.find({
-        deliveryMan: deliveryManId,
-        status: 'delivered',
-        deliveryEarnings: { $gt: 0 }
-      })
-        .populate('user', 'name email phone')
-        .populate('items.food', 'name price image category')
-        .sort({ createdAt: -1 });
-
-      // Group earnings by month
-      const earningsByMonth = {};
-      orders.forEach(order => {
-        const date = new Date(order.actualDeliveryTime || order.updatedAt);
-        const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        const monthName = date.toLocaleString('default', { year: 'numeric', month: 'long' });
-        
-        if (!earningsByMonth[monthKey]) {
-          earningsByMonth[monthKey] = {
-            month: monthName,
-            monthKey: monthKey,
-            totalEarnings: 0,
-            orderCount: 0,
-            orders: []
-          };
-        }
-        
-        earningsByMonth[monthKey].totalEarnings += order.deliveryEarnings;
-        earningsByMonth[monthKey].orderCount += 1;
-        earningsByMonth[monthKey].orders.push({
-          _id: order._id,
-          orderNumber: order._id.slice(-6),
-          customerName: order.user?.name,
-          totalAmount: order.totalAmount,
-          earnings: order.deliveryEarnings,
-          deliveryDate: order.actualDeliveryTime || order.updatedAt
-        });
-      });
-
-      // Convert to array and sort by month
-      const earningsHistory = Object.values(earningsByMonth).sort((a, b) => 
-        new Date(a.monthKey).getTime() - new Date(b.monthKey).getTime()
-      );
-
-      // Calculate total earnings
-      const totalEarnings = earningsHistory.reduce((sum, month) => sum + month.totalEarnings, 0);
-      const totalOrders = earningsHistory.reduce((sum, month) => sum + month.orderCount, 0);
-
-      res.status(200).json({ 
-        message: "Delivery earnings retrieved successfully",
-        data: {
-          earningsHistory,
-          totalEarnings,
-          totalOrders,
-          orders
-        }
-      });
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }

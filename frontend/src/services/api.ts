@@ -47,7 +47,6 @@ export interface Order {
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
   deliveryAddress: string;
   deliveryMan?: User;
-  deliveryEarnings?: number;
   estimatedDeliveryTime?: string;
   actualDeliveryTime?: string;
   deliveryNotes?: string;
@@ -159,17 +158,17 @@ class ApiService {
     return handleResponse<Food>(response);
   }
 
-  async addFood(foodData: Omit<Food, '_id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Food>> {
+  async addFood(foodData: FormData): Promise<ApiResponse<Food>> {
     const token = getAuthToken();
     if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/food/new`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        // Don't set Content-Type for FormData, let the browser set it with boundary
       },
-      body: JSON.stringify(foodData),
+      body: foodData,
     });
     return handleResponse<Food>(response);
   }
@@ -343,6 +342,21 @@ class ApiService {
     return handleResponse<User[]>(response);
   }
 
+  async updateDeliveryAvailability(isAvailable: boolean): Promise<ApiResponse<{ isAvailable: boolean }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    
+    const response = await fetch(`${this.baseURL}/deliveryman/availability`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ isAvailable }),
+    });
+    return handleResponse<{ isAvailable: boolean }>(response);
+  }
+
   async getDeliveryManById(id: string): Promise<ApiResponse<User>> {
     const token = getAuthToken();
     if (!token) throw new Error('Authentication required');
@@ -383,51 +397,6 @@ class ApiService {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     return handleResponse<Order[]>(response);
-  }
-
-  async getDeliveryEarnings(): Promise<ApiResponse<{
-    earningsHistory: Array<{
-      month: string;
-      monthKey: string;
-      totalEarnings: number;
-      orderCount: number;
-      orders: Array<{
-        _id: string;
-        orderNumber: string;
-        customerName: string;
-        totalAmount: number;
-        earnings: number;
-        deliveryDate: string;
-      }>;
-    }>;
-    totalEarnings: number;
-    totalOrders: number;
-    orders: Order[];
-  }>> {
-    const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
-    const response = await fetch(`${this.baseURL}/orders/delivery/earnings`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    return handleResponse<{
-      earningsHistory: Array<{
-        month: string;
-        monthKey: string;
-        totalEarnings: number;
-        orderCount: number;
-        orders: Array<{
-          _id: string;
-          orderNumber: string;
-          customerName: string;
-          totalAmount: number;
-          earnings: number;
-          deliveryDate: string;
-        }>;
-      }>;
-      totalEarnings: number;
-      totalOrders: number;
-      orders: Order[];
-    }>(response);
   }
 }
 

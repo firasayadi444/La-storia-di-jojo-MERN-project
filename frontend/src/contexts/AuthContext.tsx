@@ -8,6 +8,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, cf_password: string, address?: string) => Promise<boolean>;
   logout: () => void;
   refreshUser: () => void;
+  updateUserAvailability: (isAvailable: boolean) => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
   loading: boolean;
@@ -96,6 +97,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const updateUserAvailability = (isAvailable: boolean) => {
+    if (user) {
+      const updatedUser = { ...user, isAvailable };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -103,6 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     refreshUser,
+    updateUserAvailability,
     isAuthenticated: !!user && !!token,
     isAdmin: user?.role === 'admin',
     loading

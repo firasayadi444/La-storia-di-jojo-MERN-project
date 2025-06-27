@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Menu, LogOut, Home, Truck, Bell, FileText, Users, BarChart2, Inbox } from 'lucide-react';
+import { ShoppingCart, User, Menu, LogOut, Home, Truck, Bell, FileText, Users, BarChart2, Inbox, Plus, Clock, Wifi, WifiOff, TrendingUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
+import { useAvailability } from '../contexts/AvailabilityContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -12,19 +13,23 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { apiService } from '../services/api';
+import type { Order } from '../services/api';
 
 const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, logout, isAuthenticated } = useAuth();
   const { getTotalItems } = useCart();
+  const { isAvailable } = useAvailability();
   const location = useLocation();
   const navigate = useNavigate();
+  const [deliveryNotificationsCount, setDeliveryNotificationsCount] = useState(0);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [hasActiveOrders, setHasActiveOrders] = useState(false);
 
   const cartItemCount = getTotalItems();
 
   const [newOrdersCount, setNewOrdersCount] = useState(0);
   const [newDeliveryMenCount, setNewDeliveryMenCount] = useState(0);
-  const [deliveryNotificationsCount, setDeliveryNotificationsCount] = useState(0);
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -37,7 +42,7 @@ const Navbar: React.FC = () => {
             setNewOrdersCount(pendingOrders.length);
             // Fetch pending delivery men
             const deliveryMenRes = await apiService.getPendingDeliveryMen();
-            setNewDeliveryMenCount((deliveryMenRes.pending || deliveryMenRes.data || []).length);
+            setNewDeliveryMenCount((deliveryMenRes.data || []).length);
           } else if (user?.role === 'delivery') {
             // Fetch delivery notifications
             const notificationsRes = await apiService.getDeliveryNotifications();
@@ -51,6 +56,29 @@ const Navbar: React.FC = () => {
     };
     fetchNotifications();
   }, [isAuthenticated, user]);
+
+  // Check for active orders for delivery men
+  useEffect(() => {
+    if (user?.role === 'delivery') {
+      const checkActiveOrders = async () => {
+        try {
+          const response = await apiService.getDeliveryNotifications();
+          const activeOrders = response.data || [];
+          const hasActive = activeOrders.some((order: Order) => 
+            order.status === 'ready' || order.status === 'out_for_delivery'
+          );
+          setHasActiveOrders(hasActive);
+        } catch (error) {
+          console.error('Error checking active orders:', error);
+        }
+      };
+      
+      checkActiveOrders();
+      // Check every 30 seconds
+      const interval = setInterval(checkActiveOrders, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -86,18 +114,33 @@ const Navbar: React.FC = () => {
               <span>Home</span>
             </Link>
 
+            {isAuthenticated && user?.role === 'user' && (
+              <Link
+                to="/orders"
+                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/orders') 
+                    ? 'text-italian-green-700 bg-italian-green-50' 
+                    : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                <span>My Orders</span>
+              </Link>
+            )}
+
             {isAuthenticated && (
               <>
-                {user?.role === 'delivery' && (
+                {user?.role === 'user' && (
                   <Link
                     to="/dashboard"
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive('/dashboard') 
                         ? 'text-italian-green-700 bg-italian-green-50' 
                         : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
                     }`}
                   >
-                    Dashboard
+                    <BarChart2 className="h-4 w-4" />
+                    <span>Dashboard</span>
                   </Link>
                 )}
                 {user?.role === 'admin' && (
@@ -105,6 +148,10 @@ const Navbar: React.FC = () => {
                     <Link to="/admin/feedbacks" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/feedbacks') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
                       <FileText className="h-4 w-4" />
                       <span>Feedbacks</span>
+                    </Link>
+                    <Link to="/admin/add-food" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/add-food') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
+                      <Plus className="h-4 w-4" />
+                      <span>Add Food</span>
                     </Link>
                     <Link to="/admin/analytics" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/analytics') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
                       <BarChart2 className="h-4 w-4" />
@@ -128,20 +175,52 @@ const Navbar: React.FC = () => {
                 )}
 
                 {user?.role === 'delivery' && (
-                  <Link
-                    to="/delivery"
-                    className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive('/delivery') 
-                        ? 'text-italian-green-700 bg-italian-green-50' 
-                        : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
-                    }`}
-                  >
-                    <Truck className="h-4 w-4" />
-                    <span>Delivery</span>
-                    {deliveryNotificationsCount > 0 && (
-                      <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white">{deliveryNotificationsCount}</span>
+                  <>
+                    <Link
+                      to="/delivery"
+                      className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive('/delivery') 
+                          ? 'text-italian-green-700 bg-italian-green-50' 
+                          : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
+                      }`}
+                    >
+                      <Truck className="h-4 w-4" />
+                      <span>Delivery</span>
+                      {deliveryNotificationsCount > 0 && (
+                        <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white">{deliveryNotificationsCount}</span>
+                      )}
+                    </Link>
+                    <Link
+                      to="/delivery-stats"
+                      className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive('/delivery-stats') 
+                          ? 'text-italian-green-700 bg-italian-green-50' 
+                          : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
+                      }`}
+                    >
+                      <TrendingUp className="h-4 w-4" />
+                      <span>Stats & History</span>
+                    </Link>
+                  </>
+                )}
+
+                {/* Availability Indicator for Delivery Men */}
+                {user?.role === 'delivery' && (
+                  <div className="flex items-center space-x-2 px-3 py-2">
+                    {isAvailable ? (
+                      <Wifi className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <WifiOff className="h-4 w-4 text-red-600" />
                     )}
-                  </Link>
+                    <span className="text-sm font-medium text-gray-600">
+                      {isAvailable ? 'Available' : 'Unavailable'}
+                    </span>
+                    {hasActiveOrders && (
+                      <span className="text-xs text-orange-600 bg-orange-100 px-1 py-0.5 rounded">
+                        Active
+                      </span>
+                    )}
+                  </div>
                 )}
               </>
             )}
@@ -150,7 +229,7 @@ const Navbar: React.FC = () => {
           {/* Right Side Actions */}
           <div className="flex items-center space-x-4">
             {/* Cart */}
-            {isAuthenticated && user?.role !== 'delivery' && (
+            {isAuthenticated && user?.role === 'user' && (
               <Link to="/cart" className="relative p-2 text-gray-600 hover:text-italian-green-700 transition-colors">
                 <ShoppingCart className="h-6 w-6" />
                 {cartItemCount > 0 && (
@@ -228,8 +307,28 @@ const Navbar: React.FC = () => {
               >
                 Home
               </Link>
+              {isAuthenticated && user?.role === 'user' && (
+                <Link
+                  to="/orders"
+                  className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Clock className="h-4 w-4" />
+                  <span>My Orders</span>
+                </Link>
+              )}
               {isAuthenticated && (
                 <>
+                  {user?.role === 'user' && (
+                    <Link
+                      to="/cart"
+                      className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                      <span>Cart ({cartItemCount})</span>
+                    </Link>
+                  )}
                   {user?.role === 'delivery' && (
                     <Link
                       to="/dashboard"

@@ -14,7 +14,7 @@ interface FoodCardProps {
 
 const FoodCard: React.FC<FoodCardProps> = ({ food }) => {
   const { addToCart } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
   const handleAddToCart = () => {
@@ -22,6 +22,15 @@ const FoodCard: React.FC<FoodCardProps> = ({ food }) => {
       toast({
         title: "Benvenuto! Please login",
         description: "Join our famiglia to add delicious items to your cart",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (user?.role !== 'user') {
+      toast({
+        title: "Access Restricted",
+        description: "Only customers can add items to cart and place orders",
         variant: "destructive"
       });
       return;
@@ -42,6 +51,7 @@ const FoodCard: React.FC<FoodCardProps> = ({ food }) => {
           alt={food.name}
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
           onError={(e) => {
+            console.log('Image failed to load:', food.image);
             e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop`;
           }}
         />
@@ -75,14 +85,20 @@ const FoodCard: React.FC<FoodCardProps> = ({ food }) => {
             View Recipe
           </Link>
           
-          <Button
-            onClick={handleAddToCart}
-            size="sm"
-            className="btn-gradient text-white flex items-center space-x-2 rounded-full px-4 shadow-md hover:shadow-lg"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add</span>
-          </Button>
+          {user?.role === 'user' ? (
+            <Button
+              onClick={handleAddToCart}
+              size="sm"
+              className="btn-gradient text-white flex items-center space-x-2 rounded-full px-4 shadow-md hover:shadow-lg"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add</span>
+            </Button>
+          ) : (
+            <div className="text-xs text-italian-green-600 px-3 py-1 bg-italian-cream-100 rounded-full">
+              {user?.role === 'admin' ? 'Admin' : 'Delivery'}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -7,13 +7,15 @@ interface ProtectedRouteProps {
   requireAuth?: boolean;
   requireAdmin?: boolean;
   requireDelivery?: boolean;
+  requireUser?: boolean;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAuth = false, 
   requireAdmin = false, 
-  requireDelivery = false 
+  requireDelivery = false,
+  requireUser = false
 }) => {
   const { user, isAuthenticated, loading } = useAuth();
 
@@ -43,6 +45,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // If delivery access is required but user is not delivery
   if (requireDelivery && user?.role !== 'delivery') {
+    return <Navigate to="/" replace />;
+  }
+
+  // If user access is required but user is not a customer
+  if (requireUser && user?.role !== 'user') {
     return <Navigate to="/" replace />;
   }
 

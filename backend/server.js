@@ -37,6 +37,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static('uploads'));
+
 // Add route logging middleware
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);

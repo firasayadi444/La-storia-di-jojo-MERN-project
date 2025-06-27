@@ -40,10 +40,6 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'user',
     },
-    deliveryEarnings: {
-      type: Number,
-      default: 0,
-    },
     estimatedDeliveryTime: {
       type: Date,
     },

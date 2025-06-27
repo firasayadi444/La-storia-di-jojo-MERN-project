@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const deliverymanController = require('../controllers/deliverymanController');
+const { authMiddleware } = require('../middlewares/authMiddleware');
 
 // Test route to check if deliverymanRoute is loaded
 router.get('/test', (req, res) => {
@@ -39,6 +40,10 @@ router.post('/approve/:id', deliverymanController.approve);
 
 // Reject a deliveryman application
 router.post('/reject/:id', deliverymanController.reject);
+
+// Update delivery man availability (delivery man only) - SPECIFIC ROUTE FIRST
+console.log('updateAvailability:', typeof deliverymanController.updateAvailability);
+router.put('/availability', authMiddleware, deliverymanController.updateAvailability);
 
 // Delete a delivery man by ID (admin only)
 router.delete('/:id', deliverymanController.deleteById);

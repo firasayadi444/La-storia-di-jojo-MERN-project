@@ -145,6 +145,7 @@ const AdminDeliverymen: React.FC = () => {
                 <th className="px-4 py-2 border">Email</th>
                 <th className="px-4 py-2 border">Phone</th>
                 <th className="px-4 py-2 border">Status</th>
+                <th className="px-4 py-2 border">Availability</th>
                 <th className="px-4 py-2 border">Actions</th>
               </tr>
             </thead>
@@ -161,6 +162,21 @@ const AdminDeliverymen: React.FC = () => {
                   <td className="px-4 py-2 border">{dm.phone}</td>
                   <td className="px-4 py-2 border">
                     <span className={`px-2 py-1 rounded text-xs font-semibold border ${statusColors[dm.status || 'active'] || ''}`}>{dm.status || 'active'}</span>
+                  </td>
+                  <td className="px-4 py-2 border">
+                    {dm.status === 'active' ? (
+                      <span className={`px-2 py-1 rounded text-xs font-semibold border ${
+                        dm.isAvailable 
+                          ? 'bg-green-100 text-green-800 border-green-300' 
+                          : 'bg-red-100 text-red-800 border-red-300'
+                      }`}>
+                        {dm.isAvailable ? 'Available' : 'Unavailable'}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 rounded text-xs font-semibold border bg-gray-100 text-gray-800 border-gray-300">
+                        N/A
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-2 border space-x-2">
                     <Button size="sm" variant="outline" aria-label="View details" onClick={() => openDetails(dm._id)}>Details</Button>
@@ -201,6 +217,17 @@ const AdminDeliverymen: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                 <div><b>Vehicle Type:</b> {details.vehicleType || <span className="text-gray-400">N/A</span>}</div>
                 <div><b>Status:</b> {details.status}</div>
+                {details.status === 'active' && (
+                  <div><b>Availability:</b> 
+                    <span className={`ml-1 px-2 py-1 rounded text-xs font-semibold border ${
+                      details.isAvailable 
+                        ? 'bg-green-100 text-green-800 border-green-300' 
+                        : 'bg-red-100 text-red-800 border-red-300'
+                    }`}>
+                      {details.isAvailable ? 'Available' : 'Unavailable'}
+                    </span>
+                  </div>
+                )}
                 {details.address && <div className="col-span-2"><b>Address:</b> {details.address}</div>}
                 {details.createdAt && <div><b>Created:</b> {new Date(details.createdAt).toLocaleString()}</div>}
                 {details.updatedAt && <div><b>Updated:</b> {new Date(details.updatedAt).toLocaleString()}</div>}

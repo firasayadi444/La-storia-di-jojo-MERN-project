@@ -65,16 +65,4 @@ The frontend makes the following calls:
 3. ✅ Fixed incorrect import of `adminAuthMiddleware` in userRoutes
 4. ✅ Added default JWT_SECRET and DB environment variables
 5. ✅ Added better error handling and debugging logs
-6. ✅ Added route logging middleware for debugging
-
-## Testing
-Run the test server:
-```bash
-node test-routes.js
-```
-
-Then test the endpoints:
-- `GET http://localhost:5000/test` - Should return "Server is working"
-- `GET http://localhost:5000/routes` - Should list all routes
-- `GET http://localhost:5000/api/test` - Should return "Order route is working"
-- `GET http://localhost:5000/api/foods` - Should return food list (if any) 
+6. ✅ Added route logging middleware for debugging 

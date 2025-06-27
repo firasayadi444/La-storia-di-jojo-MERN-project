@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 const Cart: React.FC = () => {
   const { items, updateQuantity, removeFromCart, getTotalPrice } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   if (!isAuthenticated) {
@@ -19,6 +19,24 @@ const Cart: React.FC = () => {
           <p className="text-gray-600 mb-6">You need to be logged in to view your cart.</p>
           <Button asChild className="btn-gradient text-white">
             <Link to="/login">Login</Link>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (user?.role !== 'user') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md">
+          <ShoppingCart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Access Restricted</h2>
+          <p className="text-gray-600 mb-6">
+            {user?.role === 'admin' ? 'Admins cannot place orders' : 'Delivery personnel cannot place orders'}
+          </p>
+          <p className="text-gray-600 mb-6">Only customers can access the cart and place orders.</p>
+          <Button asChild className="btn-gradient text-white">
+            <Link to="/">Return to Menu</Link>
           </Button>
         </Card>
       </div>

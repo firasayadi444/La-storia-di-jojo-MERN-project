@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AppProvider } from "./contexts/AppContext";
 import { CartProvider } from "./contexts/CartContext";
+import { AvailabilityProvider } from "./contexts/AvailabilityContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
@@ -23,6 +24,9 @@ import AdminOrders from './pages/AdminOrders';
 import AdminDeliverymen from './pages/AdminDeliverymen';
 import AdminFeedbacks from './pages/AdminFeedbacks';
 import AdminAnalytics from './pages/AdminAnalytics';
+import AdminAddFood from './pages/AdminAddFood';
+import UserOrders from './pages/UserOrders';
+import DeliveryStats from './pages/DeliveryStats';
 
 const queryClient = new QueryClient();
 
@@ -30,36 +34,41 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <CartProvider>
-          <AppProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <div className="min-h-screen bg-gray-50">
-                <Navbar />
-                <main>
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/change-password" element={<ChangePassword />} />
-                    <Route path="/food/:id" element={<FoodDetail />} />
-                    <Route path="/cart" element={<ProtectedRoute requireAuth><Cart /></ProtectedRoute>} />
-                    <Route path="/checkout" element={<ProtectedRoute requireAuth><Checkout /></ProtectedRoute>} />
-                    <Route path="/dashboard" element={<ProtectedRoute requireAuth requireDelivery><Dashboard /></ProtectedRoute>} />
-                    <Route path="/delivery" element={<ProtectedRoute requireAuth requireDelivery><DeliveryDashboard /></ProtectedRoute>} />
-                    <Route path="/admin/orders" element={<ProtectedRoute requireAuth requireAdmin><AdminOrders /></ProtectedRoute>} />
-                    <Route path="/admin/deliverymen" element={<ProtectedRoute requireAuth requireAdmin><AdminDeliverymen /></ProtectedRoute>} />
-                    <Route path="/admin/feedbacks" element={<ProtectedRoute requireAuth requireAdmin><AdminFeedbacks /></ProtectedRoute>} />
-                    <Route path="/admin/analytics" element={<ProtectedRoute requireAuth requireAdmin><AdminAnalytics /></ProtectedRoute>} />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </main>
-              </div>
-            </BrowserRouter>
-          </AppProvider>
-        </CartProvider>
+        <AvailabilityProvider>
+          <CartProvider>
+            <AppProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <div className="min-h-screen bg-gray-50">
+                  <Navbar />
+                  <main>
+                    <Routes>
+                      <Route path="/" element={<Home />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/register" element={<Register />} />
+                      <Route path="/change-password" element={<ChangePassword />} />
+                      <Route path="/food/:id" element={<FoodDetail />} />
+                      <Route path="/cart" element={<ProtectedRoute requireAuth><Cart /></ProtectedRoute>} />
+                      <Route path="/checkout" element={<ProtectedRoute requireAuth><Checkout /></ProtectedRoute>} />
+                      <Route path="/dashboard" element={<ProtectedRoute requireAuth requireDelivery><Dashboard /></ProtectedRoute>} />
+                      <Route path="/delivery" element={<ProtectedRoute requireAuth requireDelivery><DeliveryDashboard /></ProtectedRoute>} />
+                      <Route path="/delivery-stats" element={<ProtectedRoute requireAuth requireDelivery><DeliveryStats /></ProtectedRoute>} />
+                      <Route path="/admin/orders" element={<ProtectedRoute requireAuth requireAdmin><AdminOrders /></ProtectedRoute>} />
+                      <Route path="/admin/deliverymen" element={<ProtectedRoute requireAuth requireAdmin><AdminDeliverymen /></ProtectedRoute>} />
+                      <Route path="/admin/feedbacks" element={<ProtectedRoute requireAuth requireAdmin><AdminFeedbacks /></ProtectedRoute>} />
+                      <Route path="/admin/analytics" element={<ProtectedRoute requireAuth requireAdmin><AdminAnalytics /></ProtectedRoute>} />
+                      <Route path="/admin/add-food" element={<ProtectedRoute requireAuth requireAdmin><AdminAddFood /></ProtectedRoute>} />
+                      <Route path="/orders" element={<ProtectedRoute requireAuth requireUser><UserOrders /></ProtectedRoute>} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </main>
+                </div>
+              </BrowserRouter>
+            </AppProvider>
+          </CartProvider>
+        </AvailabilityProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

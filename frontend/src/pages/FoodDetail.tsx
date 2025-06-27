@@ -1,31 +1,64 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Minus } from 'lucide-react';
-import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { apiService, Food } from '../services/api';
 
 const FoodDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { foods, addToCart } = useApp();
-  const { isAuthenticated } = useAuth();
+  const { addToCart } = useCart();
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [quantity, setQuantity] = React.useState(1);
+  const [quantity, setQuantity] = useState(1);
+  const [food, setFood] = useState<Food | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const food = foods.find(f => f.id === id);
+  useEffect(() => {
+    const fetchFood = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        const response = await apiService.getFoodDetails(id);
+        setFood(response.food || response.data);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load food details');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (!food) {
+    fetchFood();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-italian-cream-50 to-white flex items-center justify-center">
+        <Card className="p-8 text-center card-warm max-w-md">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-italian-green-700 mx-auto mb-4"></div>
+          <h2 className="text-2xl font-serif font-bold text-italian-green-800 mb-4">Caricamento...</h2>
+          <p className="text-italian-green-700">Loading your delicious dish...</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error || !food) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-italian-cream-50 to-white flex items-center justify-center">
         <Card className="p-8 text-center card-warm max-w-md">
           <span className="text-6xl mb-4 block">😕</span>
           <h2 className="text-2xl font-serif font-bold text-italian-green-800 mb-4">Piatto Non Trovato</h2>
-          <p className="text-italian-green-700 mb-6">This delicious dish seems to have wandered off from our menu.</p>
+          <p className="text-italian-green-700 mb-6">
+            {error || "This delicious dish seems to have wandered off from our menu."}
+          </p>
           <Button onClick={() => navigate('/')} className="btn-gradient text-white">
             Return to Menu
           </Button>
@@ -39,6 +72,15 @@ const FoodDetail: React.FC = () => {
       toast({
         title: "Benvenuto! Please login",
         description: "Join our famiglia to add delicious items to your cart",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (user?.role !== 'user') {
+      toast({
+        title: "Access Restricted",
+        description: "Only customers can add items to cart and place orders",
         variant: "destructive"
       });
       return;
@@ -103,7 +145,7 @@ const FoodDetail: React.FC = () => {
                 
                 <div className="flex items-center mb-6">
                   <span className="text-3xl font-bold text-italian-green-700">
-                    €{food.cost.toFixed(2)}
+                    €{food.price.toFixed(2)}
                   </span>
                   <span className="ml-2 text-sm text-italian-green-600">per porzione</span>
                 </div>
@@ -145,19 +187,30 @@ const FoodDetail: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-medium text-italian-green-800">Totale:</span>
                     <span className="text-2xl font-bold text-italian-green-700">
-                      €{(food.cost * quantity).toFixed(2)}
+                      €{(food.price * quantity).toFixed(2)}
                     </span>
                   </div>
                 </div>
 
                 {/* Add to Cart Button */}
-                <Button
-                  onClick={handleAddToCart}
-                  className="w-full btn-gradient text-white py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl"
-                >
-                  <Plus className="h-5 w-5 mr-2" />
-                  Aggiungi al Carrello
-                </Button>
+                {user?.role === 'user' ? (
+                  <Button
+                    onClick={handleAddToCart}
+                    className="w-full btn-gradient text-white py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Aggiungi al Carrello
+                  </Button>
+                ) : (
+                  <div className="w-full p-4 bg-italian-cream-100 rounded-xl border border-italian-cream-200 text-center">
+                    <p className="text-italian-green-700 font-medium">
+                      {user?.role === 'admin' ? 'Admins cannot place orders' : 'Delivery personnel cannot place orders'}
+                    </p>
+                    <p className="text-sm text-italian-green-600 mt-1">
+                      Only customers can add items to cart and place orders
+                    </p>
+                  </div>
+                )}
 
                 {!isAuthenticated && (
                   <p className="text-sm text-italian-green-600 text-center mt-4">
