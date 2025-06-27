@@ -1,6 +1,11 @@
 const mongoose = require("mongoose");
 
 const connectDatabase = () => {
+  // Don't connect if already connected or in test environment
+  if (mongoose.connection.readyState !== 0 || process.env.NODE_ENV === 'test') {
+    return;
+  }
+
   const options = {
     useNewUrlParser: true,
     useUnifiedTopology: true,

@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const deliverymanController = require('../controllers/deliverymanController');
-const { authMiddleware } = require('../middlewares/authMiddleware');
+const { authMiddleware, adminAuthMiddleware } = require('../middlewares/authMiddleware');
 
 // Test route to check if deliverymanRoute is loaded
 router.get('/test', (req, res) => {
@@ -29,26 +29,26 @@ router.post('/apply', upload.fields([
   { name: 'cinPhoto', maxCount: 1 },
 ]), deliverymanController.apply);
 
-// List all pending deliveryman applications - SPECIFIC ROUTE FIRST
-router.get('/pending', deliverymanController.listPending);
+// List all pending deliveryman applications - Admin only
+router.get('/pending', adminAuthMiddleware, deliverymanController.listPending);
 
-// GET /api/deliveryman/all - SPECIFIC ROUTE FIRST
-router.get('/all', deliverymanController.listAll);
+// GET /api/deliveryman/all - Admin only
+router.get('/all', adminAuthMiddleware, deliverymanController.listAll);
 
-// Approve a deliveryman application
-router.post('/approve/:id', deliverymanController.approve);
+// Approve a deliveryman application - Admin only
+router.post('/approve/:id', adminAuthMiddleware, deliverymanController.approve);
 
-// Reject a deliveryman application
-router.post('/reject/:id', deliverymanController.reject);
+// Reject a deliveryman application - Admin only
+router.post('/reject/:id', adminAuthMiddleware, deliverymanController.reject);
 
-// Update delivery man availability (delivery man only) - SPECIFIC ROUTE FIRST
+// Update delivery man availability (delivery man only)
 console.log('updateAvailability:', typeof deliverymanController.updateAvailability);
 router.put('/availability', authMiddleware, deliverymanController.updateAvailability);
 
 // Delete a delivery man by ID (admin only)
-router.delete('/:id', deliverymanController.deleteById);
+router.delete('/:id', adminAuthMiddleware, deliverymanController.deleteById);
 
-// Get a single delivery man by ID - GENERIC ROUTE LAST
-router.get('/:id', deliverymanController.getById);
+// Get a single delivery man by ID - Admin only
+router.get('/:id', adminAuthMiddleware, deliverymanController.getById);
 
 module.exports = router; 

@@ -18,6 +18,12 @@ const deliverymanController = {
         return res.status(400).json({ message: 'Name and email are required.' });
       }
 
+      // Email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+      }
+
       const existing = await Users.findOne({ email });
       if (existing) {
         return res.status(400).json({ message: 'Email already in use.' });
@@ -186,8 +192,12 @@ const deliverymanController = {
       }
 
       const user = await Users.findById(deliveryManId);
-      if (!user || user.role !== 'delivery') {
-        return res.status(404).json({ message: 'Delivery man not found.' });
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+      
+      if (user.role !== 'delivery') {
+        return res.status(403).json({ message: 'Access denied. Only delivery personnel can update availability.' });
       }
 
       // Check if delivery man is trying to go unavailable while having active orders

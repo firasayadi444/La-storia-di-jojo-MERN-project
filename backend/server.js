@@ -13,7 +13,10 @@ if (!process.env.DB) {
   console.log("No DB environment variable found, using default: mongodb://localhost:27017/orderapp");
 }
 
-connectDatabase();
+// Only connect to database if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  connectDatabase();
+}
 
 app.use(bodyParser.json());
 app.use(cors({
@@ -40,11 +43,13 @@ app.use(cors({
 // Serve static files from uploads directory
 app.use('/uploads', express.static('uploads'));
 
-// Add route logging middleware
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
-  next();
-});
+// Add route logging middleware (only in non-test environment)
+if (process.env.NODE_ENV !== 'test') {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`);
+    next();
+  });
+}
 
 // Test route to check if server is working
 app.get('/test', (req, res) => {
@@ -52,26 +57,40 @@ app.get('/test', (req, res) => {
 });
 
 // Mount routes in specific order to avoid conflicts
-console.log('Mounting routes...');
+if (process.env.NODE_ENV !== 'test') {
+  console.log('Mounting routes...');
+}
 
 // Mount more specific routes first
-console.log('Mounting auth routes...');
+if (process.env.NODE_ENV !== 'test') {
+  console.log('Mounting auth routes...');
+}
 app.use("/api", require("./routes/authRoute"));
 
-console.log('Mounting food routes...');
+if (process.env.NODE_ENV !== 'test') {
+  console.log('Mounting food routes...');
+}
 app.use("/api", require("./routes/foodRoute"));
 
-console.log('Mounting order routes...');
+if (process.env.NODE_ENV !== 'test') {
+  console.log('Mounting order routes...');
+}
 app.use("/api", require("./routes/orderRoute"));
 
-console.log('Mounting user routes...');
+if (process.env.NODE_ENV !== 'test') {
+  console.log('Mounting user routes...');
+}
 app.use("/api", require("./routes/userRoutes"));
 
 // Mount deliveryman route with /deliveryman prefix
-console.log('Mounting deliveryman routes...');
+if (process.env.NODE_ENV !== 'test') {
+  console.log('Mounting deliveryman routes...');
+}
 app.use("/api/deliveryman", require("./routes/deliverymanRoute"));
 
-console.log('All routes mounted successfully');
+if (process.env.NODE_ENV !== 'test') {
+  console.log('All routes mounted successfully');
+}
 
 // Add error handling middleware AFTER routes
 app.use((err, req, res, next) => {
@@ -81,17 +100,24 @@ app.use((err, req, res, next) => {
 
 // 404 handler for unmatched routes
 app.use('*', (req, res) => {
-  console.log(`404 - Route not found: ${req.method} ${req.path}`);
+  if (process.env.NODE_ENV !== 'test') {
+    console.log(`404 - Route not found: ${req.method} ${req.path}`);
+  }
   res.status(404).json({ message: 'Route not found' });
 });
 
 const port = process.env.PORT || 5000;
 
-app.listen(port, () => {
-  console.log(`Server is running on port: ${port}`);
-  console.log('Available routes:');
-  console.log('- GET /test');
-  console.log('- GET /api/foods');
-  console.log('- GET /api/deliveryman/pending');
-  console.log('- GET /api/deliveryman/all');
-});
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`Server is running on port: ${port}`);
+    console.log('Available routes:');
+    console.log('- GET /test');
+    console.log('- GET /api/foods');
+    console.log('- GET /api/deliveryman/pending');
+    console.log('- GET /api/deliveryman/all');
+  });
+}
+
+module.exports = app;

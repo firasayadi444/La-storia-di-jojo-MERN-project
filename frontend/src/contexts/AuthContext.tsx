@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiService, User } from '../services/api';
+import { clearAuthData, checkAuthValidity } from '../utils/clearAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -39,8 +40,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const storedUser = localStorage.getItem('user');
     
     if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      // Validate the stored auth data
+      if (checkAuthValidity()) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      } else {
+        // Clear invalid auth data
+        clearAuthData();
+        console.log('Invalid auth data detected and cleared');
+      }
     }
     setLoading(false);
   }, []);
@@ -86,8 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    clearAuthData();
   };
 
   const refreshUser = () => {

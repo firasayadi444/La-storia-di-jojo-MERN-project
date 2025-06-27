@@ -15,17 +15,35 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Token received:', token.substring(0, 20) + '...');
+    
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log('Decoded token:', decoded);
+    } catch (jwtError) {
+      console.error('JWT verification error:', jwtError);
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    
+    // Check if decoded has the expected structure
+    if (!decoded || !decoded._id) {
+      console.error('Invalid token structure:', decoded);
+      return res.status(401).json({ message: "Invalid token structure" });
+    }
     
     const user = await Users.findOne({ _id: decoded._id });
     if (!user) {
-      return res.status(401).json({ message: "Invalid Authentication." });
+      console.error('User not found for ID:', decoded._id);
+      return res.status(401).json({ message: "User not found" });
     }
 
     req.user = user;
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
+    console.error('Error stack:', error.stack);
     return res.status(401).json({ message: "Invalid Authentication." });
   }
 };
@@ -38,14 +56,32 @@ const adminAuthMiddleware = async (req, res, next) => {
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Admin token received:', token.substring(0, 20) + '...');
+    
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log('Admin decoded token:', decoded);
+    } catch (jwtError) {
+      console.error('Admin JWT verification error:', jwtError);
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    
+    // Check if decoded has the expected structure
+    if (!decoded || !decoded._id) {
+      console.error('Invalid admin token structure:', decoded);
+      return res.status(401).json({ message: "Invalid token structure" });
+    }
     
     const user = await Users.findOne({ _id: decoded._id });
     if (!user) {
-      return res.status(401).json({ message: "Invalid Authentication." });
+      console.error('Admin user not found for ID:', decoded._id);
+      return res.status(401).json({ message: "User not found" });
     }
 
     if (user.role !== "admin") {
+      console.error('User is not admin:', user.role);
       return res.status(403).json({ message: "You are not authorized" });
     }
 
@@ -53,6 +89,7 @@ const adminAuthMiddleware = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Admin auth middleware error:', error);
+    console.error('Admin error stack:', error.stack);
     return res.status(401).json({ message: "Invalid Authentication." });
   }
 };

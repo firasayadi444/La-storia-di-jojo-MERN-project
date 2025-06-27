@@ -94,6 +94,11 @@ const orderController = {
 
   getDeliveryOrders: async (req, res) => {
     try {
+      // Check if user is a delivery man
+      if (req.user.role !== 'delivery') {
+        return res.status(403).json({ message: "Access denied. Only delivery personnel can view delivery orders." });
+      }
+
       const deliveryManId = req.user._id;
       const orders = await Orders.find({ 
         deliveryMan: deliveryManId,

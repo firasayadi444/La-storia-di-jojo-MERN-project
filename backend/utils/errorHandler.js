@@ -1,6 +1,11 @@
 const registerValid = (name, email, password, cf_password) => {
   if (!name) return "Please enter your name";
   if (!email) return "Please enter your email";
+  
+  // Email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return "Please enter a valid email address";
+  
   if (!password) return "Please enter your password";
   if (password.length < 6) return "Password must be at least 6 characters";
   if (password !== cf_password) return "Password did not match";
