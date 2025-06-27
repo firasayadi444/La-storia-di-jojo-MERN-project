@@ -151,7 +151,7 @@ const Navbar: React.FC = () => {
                     </Link>
                     <Link to="/admin/add-food" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/add-food') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
                       <Plus className="h-4 w-4" />
-                      <span>Add Food</span>
+                      <span>Food Management</span>
                     </Link>
                     <Link to="/admin/analytics" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/analytics') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
                       <BarChart2 className="h-4 w-4" />

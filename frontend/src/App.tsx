@@ -24,7 +24,7 @@ import AdminOrders from './pages/AdminOrders';
 import AdminDeliverymen from './pages/AdminDeliverymen';
 import AdminFeedbacks from './pages/AdminFeedbacks';
 import AdminAnalytics from './pages/AdminAnalytics';
-import AdminAddFood from './pages/AdminAddFood';
+import AdminFoodManagement from './pages/AdminAddFood';
 import UserOrders from './pages/UserOrders';
 import DeliveryStats from './pages/DeliveryStats';
 
@@ -58,7 +58,7 @@ const App = () => (
                       <Route path="/admin/deliverymen" element={<ProtectedRoute requireAuth requireAdmin><AdminDeliverymen /></ProtectedRoute>} />
                       <Route path="/admin/feedbacks" element={<ProtectedRoute requireAuth requireAdmin><AdminFeedbacks /></ProtectedRoute>} />
                       <Route path="/admin/analytics" element={<ProtectedRoute requireAuth requireAdmin><AdminAnalytics /></ProtectedRoute>} />
-                      <Route path="/admin/add-food" element={<ProtectedRoute requireAuth requireAdmin><AdminAddFood /></ProtectedRoute>} />
+                      <Route path="/admin/add-food" element={<ProtectedRoute requireAuth requireAdmin><AdminFoodManagement /></ProtectedRoute>} />
                       <Route path="/orders" element={<ProtectedRoute requireAuth requireUser><UserOrders /></ProtectedRoute>} />
                       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                       <Route path="*" element={<NotFound />} />
