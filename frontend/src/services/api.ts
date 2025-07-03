@@ -92,7 +92,34 @@ export interface Address {
 
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
-  return localStorage.getItem('token');
+  return localStorage.getItem('token') || sessionStorage.getItem('token');
+};
+
+// Helper function to validate token before making requests
+const validateToken = (): boolean => {
+  const token = getAuthToken();
+  if (!token) {
+    return false;
+  }
+  
+  try {
+    // Simple token validation without external dependency
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Date.now() / 1000;
+    if (payload.exp < currentTime) {
+      // Clear expired token
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error validating token:', error);
+    // Clear invalid token
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    return false;
+  }
 };
 
 // Helper function to handle API responses
@@ -142,8 +169,8 @@ class ApiService {
     newPassword: string;
     confirmPassword: string;
   }): Promise<ApiResponse<void>> {
+    if (!validateToken()) throw new Error('Authentication required');
     const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/change-password`, {
       method: 'POST',
@@ -168,8 +195,8 @@ class ApiService {
   }
 
   async addFood(foodData: FormData): Promise<ApiResponse<Food>> {
+    if (!validateToken()) throw new Error('Authentication required');
     const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/food/new`, {
       method: 'POST',
@@ -183,8 +210,8 @@ class ApiService {
   }
 
   async updateFood(id: string, foodData: Partial<Food>): Promise<ApiResponse<Food>> {
+    if (!validateToken()) throw new Error('Authentication required');
     const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/food/${id}`, {
       method: 'PUT',
@@ -198,8 +225,8 @@ class ApiService {
   }
 
   async deleteFood(id: string): Promise<ApiResponse<void>> {
+    if (!validateToken()) throw new Error('Authentication required');
     const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/food/${id}`, {
       method: 'DELETE',

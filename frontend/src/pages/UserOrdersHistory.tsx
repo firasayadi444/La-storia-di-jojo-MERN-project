@@ -4,14 +4,24 @@ import { apiService, Order } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Eye } from 'lucide-react';
+import { Eye, Star } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 const UserOrdersHistory: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [feedbackDialog, setFeedbackDialog] = useState(false);
+  const [feedbackData, setFeedbackData] = useState({
+    deliveryRating: 5,
+    foodRating: 5,
+    feedbackComment: ''
+  });
 
   useEffect(() => {
     fetchOrders();
@@ -25,6 +35,33 @@ const UserOrdersHistory: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmitFeedback = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      await apiService.submitFeedback(selectedOrder._id, feedbackData);
+      
+      toast({
+        title: "Feedback Submitted!",
+        description: "Thank you for your feedback. It helps us improve our service!",
+      });
+
+      setFeedbackDialog(false);
+      setFeedbackData({ deliveryRating: 5, foodRating: 5, feedbackComment: '' });
+      fetchOrders(); // Refresh orders to show updated feedback
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit feedback",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const canSubmitFeedback = (order: Order) => {
+    return order.status === 'delivered' && !order.feedbackComment && !order.deliveryRating;
   };
 
   const getStatusColor = (status: string) => {
@@ -219,7 +256,49 @@ const UserOrdersHistory: React.FC = () => {
                             </div>
                           </DialogContent>
                         </Dialog>
+                        {canSubmitFeedback(order) && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setFeedbackDialog(true);
+                            }}
+                          >
+                            <Star className="h-4 w-4 mr-1 text-yellow-400" />
+                            Leave Feedback
+                          </Button>
+                        )}
                       </div>
+                      {/* Show feedback if exists */}
+                      {order.status === 'delivered' && (order.deliveryRating || order.foodRating || order.feedbackComment) && (
+                        <div className="mt-8 border-t pt-6">
+                          <h4 className="font-semibold text-italian-green-700 mb-2 flex items-center gap-2">
+                            <Star className="h-4 w-4" />
+                            Your Feedback
+                          </h4>
+                          <div className="space-y-2">
+                            {order.deliveryRating && (
+                              <p className="text-sm">
+                                <span className="text-gray-600">Delivery Rating:</span>
+                                <span className="ml-2 text-yellow-500">{'⭐'.repeat(order.deliveryRating)}</span>
+                              </p>
+                            )}
+                            {order.foodRating && (
+                              <p className="text-sm">
+                                <span className="text-gray-600">Food Rating:</span>
+                                <span className="ml-2 text-yellow-500">{'⭐'.repeat(order.foodRating)}</span>
+                              </p>
+                            )}
+                            {order.feedbackComment && (
+                              <p className="text-sm">
+                                <span className="text-gray-600">Comment:</span>
+                                <span className="ml-2 italic text-gray-700">"{order.feedbackComment}"</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -228,6 +307,89 @@ const UserOrdersHistory: React.FC = () => {
           </div>
         )}
       </div>
+      {/* Feedback Dialog */}
+      <Dialog open={feedbackDialog} onOpenChange={setFeedbackDialog}>
+        <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl shadow-2xl border-0">
+          {/* Colorful Header */}
+          <div className="bg-gradient-to-r from-green-400 via-emerald-400 to-italian-green-600 px-6 py-4 flex items-center gap-3">
+            <Star className="h-7 w-7 text-yellow-300 drop-shadow-lg animate-bounce" />
+            <div>
+              <h2 className="text-lg font-bold text-white">We Value Your Feedback!</h2>
+              <p className="text-white text-xs opacity-80">Help us improve your experience</p>
+            </div>
+          </div>
+          <div className="space-y-5 p-6">
+            {/* Delivery Rating */}
+            <div>
+              <Label htmlFor="deliveryRating" className="font-semibold text-italian-green-800">Delivery Rating</Label>
+              <div className="flex items-center space-x-2 mt-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    aria-label={`Rate delivery ${star} star${star > 1 ? 's' : ''}`}
+                    onClick={() => setFeedbackData(prev => ({ ...prev, deliveryRating: star }))}
+                    className={`text-3xl transition-transform duration-150 focus:outline-none ${feedbackData.deliveryRating >= star ? 'text-yellow-400' : 'text-gray-400'} hover:scale-125`}
+                  >
+                    <span className="select-none">★</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>Poor</span>
+                <span>Excellent</span>
+              </div>
+            </div>
+            {/* Food Rating */}
+            <div>
+              <Label htmlFor="foodRating" className="font-semibold text-italian-green-800">Food Rating</Label>
+              <div className="flex items-center space-x-2 mt-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    aria-label={`Rate food ${star} star${star > 1 ? 's' : ''}`}
+                    onClick={() => setFeedbackData(prev => ({ ...prev, foodRating: star }))}
+                    className={`text-3xl transition-transform duration-150 focus:outline-none ${feedbackData.foodRating >= star ? 'text-yellow-400' : 'text-gray-400'} hover:scale-125`}
+                  >
+                    <span className="select-none">★</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>Poor</span>
+                <span>Excellent</span>
+              </div>
+            </div>
+            {/* Feedback Comment */}
+            <div>
+              <Label htmlFor="feedbackComment" className="font-semibold text-italian-green-800">Additional Comments</Label>
+              <Textarea
+                id="feedbackComment"
+                value={feedbackData.feedbackComment}
+                onChange={(e) => {
+                  if (e.target.value.length <= 250) {
+                    setFeedbackData(prev => ({ ...prev, feedbackComment: e.target.value }));
+                  }
+                }}
+                placeholder="Share your experience, suggestions, or anything else..."
+                rows={3}
+                className="mt-1 border-italian-cream-200 focus:ring-italian-green-400"
+              />
+              <div className="text-xs text-gray-400 text-right mt-1">{feedbackData.feedbackComment.length}/250</div>
+            </div>
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-2 pt-2">
+              <Button variant="outline" onClick={() => setFeedbackDialog(false)} className="rounded-full px-5 py-2 border-gray-300">
+                Cancel
+              </Button>
+              <Button onClick={handleSubmitFeedback} className="btn-gradient text-white rounded-full px-5 py-2 shadow-lg">
+                Submit Feedback
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
