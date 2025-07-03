@@ -3,6 +3,7 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const { readdirSync } = require("fs");
 const connectDatabase = require("./utils/database");
+const initDatabase = require("./init-db");
 const app = express();
 
 require("dotenv").config();
@@ -15,7 +16,8 @@ if (!process.env.DB) {
 
 // Only connect to database if not in test environment
 if (process.env.NODE_ENV !== 'test') {
-  connectDatabase();
+  // Initialize database with indexes and seed data
+  initDatabase();
 }
 
 app.use(bodyParser.json());
@@ -29,7 +31,8 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:8080',
     'http://localhost:8081',
-      'http://localhost:8082'
+      'http://localhost:8082',
+      'http://localhost:3000'
     ];
     
     // Check if origin is localhost or local network IP
@@ -61,6 +64,20 @@ if (process.env.NODE_ENV !== 'test') {
 // Test route to check if server is working
 app.get('/test', (req, res) => {
   res.status(200).json({ message: 'Server is working' });
+});
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const healthCheck = require('./health-check');
+    const result = await healthCheck();
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'unhealthy', 
+      error: error.message 
+    });
+  }
 });
 
 // Mount routes in specific order to avoid conflicts

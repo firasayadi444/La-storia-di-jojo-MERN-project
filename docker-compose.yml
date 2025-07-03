@@ -1,0 +1,59 @@
+services:
+  # MongoDB Database
+  mongo:
+    image: mongo:latest
+    container_name: orderapp-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=orderapp
+    networks:
+      - orderapp-network
+
+  # Backend API
+  backend:
+    build: ./backend
+    container_name: orderapp-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DB=mongodb://mongo:27017/orderapp
+      - JWT_SECRET=your-super-secret-jwt-key-2024
+      - PORT=5000
+    depends_on:
+      - mongo
+    networks:
+      - orderapp-network
+
+  # Frontend React App
+  frontend:
+    build: ./frontend
+    container_name: orderapp-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+      - NODE_ENV=development
+    depends_on:
+      - backend
+    networks:
+      - orderapp-network
+
+volumes:
+  mongo_data:
+
+networks:
+  orderapp-network:
+    driver: bridge 
