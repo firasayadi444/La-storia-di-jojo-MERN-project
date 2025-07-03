@@ -107,4 +107,9 @@ ehthumbs.db
 Thumbs.db
 
 # Uploads
-backend/uploads/ 
+backend/uploads/
+
+# Ignore the CI/CD documentation file
+CI_CD_DOCUMENTATION.md 
+Delivery_Notes.md
+Delivery_Workflow.md

@@ -13,6 +13,18 @@ const statusOptions = [
   'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'
 ];
 
+// Helper for countdown
+function getCountdown(assignedAt: string | undefined) {
+  if (!assignedAt) return { min: 10, sec: 0, expired: false };
+  const assigned = new Date(assignedAt).getTime();
+  const now = Date.now();
+  const diff = 10 * 60 * 1000 - (now - assigned); // 10 min in ms
+  if (diff <= 0) return { min: 0, sec: 0, expired: true };
+  const min = Math.floor(diff / 60000);
+  const sec = Math.floor((diff % 60000) / 1000);
+  return { min, sec, expired: false };
+}
+
 const AdminOrders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [deliveryMen, setDeliveryMen] = useState<User[]>([]);
@@ -86,13 +98,15 @@ const AdminOrders: React.FC = () => {
     return diffInHours < 24; // New if less than 24 hours old
   };
 
-  const sortedOrders = [...orders].sort((a, b) => {
-    // New orders first
-    if (isNewOrder(a) && !isNewOrder(b)) return -1;
-    if (!isNewOrder(a) && isNewOrder(b)) return 1;
-    // Then by creation date (newest first)
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  const sortedOrders = [...orders]
+    .filter(order => order.status !== 'delivered')
+    .sort((a, b) => {
+      // New orders first
+      if (isNewOrder(a) && !isNewOrder(b)) return -1;
+      if (!isNewOrder(a) && isNewOrder(b)) return 1;
+      // Then by creation date (newest first)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
   const openUpdateDialog = (order: Order) => {
     setSelectedOrder(order);
@@ -154,6 +168,98 @@ const AdminOrders: React.FC = () => {
   };
 
   const stats = getOrderStats();
+
+  // OrderCard component for each order (fixes hooks-in-loop)
+  const OrderCard: React.FC<{
+    order: Order;
+    isNew: boolean;
+    deliveryMen: User[];
+    updating: string | null;
+    openUpdateDialog: (order: Order) => void;
+  }> = ({ order, isNew, deliveryMen, updating, openUpdateDialog }) => {
+    // Timer logic for assigned orders
+    const showTimer = order.status === 'ready' && order.deliveryMan && order.assignedAt;
+    const [timer, setTimer] = useState(() => getCountdown(order.assignedAt));
+    useEffect(() => {
+      if (!showTimer) return;
+      const interval = setInterval(() => {
+        setTimer(getCountdown(order.assignedAt));
+      }, 1000);
+      return () => clearInterval(interval);
+    }, [order.assignedAt, showTimer]);
+
+    return (
+      <Card
+        key={order._id}
+        className={`shadow-lg hover:shadow-xl transition-all duration-200 ${
+          isNew ? 'border-l-4 border-yellow-500 bg-yellow-50' : ''
+        } ${showTimer && timer.expired && order.status !== 'out_for_delivery' ? 'border-l-8 border-red-600 bg-red-50 animate-pulse' : ''}`}
+      >
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Order #{order._id.slice(-6)}
+                </h3>
+                {isNew && (
+                  <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                    NEW
+                  </Badge>
+                )}
+                <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
+                  {getStatusIcon(order.status)}
+                  {order.status.replace('_', ' ')}
+                </Badge>
+                {showTimer && (
+                  <span className="ml-2 flex items-center gap-1 text-xs font-mono">
+                    <Clock className="h-4 w-4 text-purple-500" />
+                    {timer.expired && order.status !== 'out_for_delivery' ? (
+                      <span className="text-red-600 font-bold">Needs Attention!</span>
+                    ) : (
+                      <span>{String(timer.min).padStart(2, '0')}:{String(timer.sec).padStart(2, '0')}</span>
+                    )}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <UserIcon className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-600">{order.user?.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-600">
+                    {order.deliveryMan?.name || 'Not assigned'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-900">
+                    €{order.totalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 text-sm text-gray-500">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {new Date(order.createdAt).toLocaleString()}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => openUpdateDialog(order)}
+                disabled={updating === order._id}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {updating === order._id ? 'Updating...' : 'Update'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen">
@@ -238,68 +344,14 @@ const AdminOrders: React.FC = () => {
         ) : (
           <div className="grid gap-6">
             {sortedOrders.map(order => (
-              <Card 
-                key={order._id} 
-                className={`shadow-lg hover:shadow-xl transition-all duration-200 ${
-                  isNewOrder(order) ? 'border-l-4 border-yellow-500 bg-yellow-50' : ''
-                }`}
-              >
-                <CardContent className="p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          Order #{order._id.slice(-6)}
-                        </h3>
-                        {isNewOrder(order) && (
-                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                            NEW
-                          </Badge>
-                        )}
-                        <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
-                          {getStatusIcon(order.status)}
-                          {order.status.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <UserIcon className="h-4 w-4 text-gray-500" />
-                          <span className="text-gray-600">{order.user?.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Truck className="h-4 w-4 text-gray-500" />
-                          <span className="text-gray-600">
-                            {order.deliveryMan?.name || 'Not assigned'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-900">
-                            €{order.totalAmount.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3 text-sm text-gray-500">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          {new Date(order.createdAt).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={() => openUpdateDialog(order)}
-                        disabled={updating === order._id}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        {updating === order._id ? 'Updating...' : 'Update'}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <OrderCard
+                key={order._id}
+                order={order}
+                isNew={isNewOrder(order)}
+                deliveryMen={deliveryMen}
+                updating={updating}
+                openUpdateDialog={openUpdateDialog}
+              />
             ))}
           </div>
         )}

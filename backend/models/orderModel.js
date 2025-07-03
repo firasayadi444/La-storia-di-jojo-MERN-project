@@ -62,6 +62,9 @@ const orderSchema = new mongoose.Schema(
     feedbackComment: {
       type: String,
     },
+    assignedAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );

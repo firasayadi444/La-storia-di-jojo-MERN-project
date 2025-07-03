@@ -53,6 +53,7 @@ export interface Order {
   deliveryRating?: number;
   foodRating?: number;
   feedbackComment?: string;
+  assignedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +80,14 @@ export interface ApiResponse<T> {
   food?: Food;
   orders?: Order[];
   order?: Order;
+}
+
+export interface Address {
+  _id?: string;
+  label: string;
+  address: string;
+  googleMapLink?: string;
+  isDefault?: boolean;
 }
 
 // Helper function to get auth token
@@ -397,6 +406,101 @@ class ApiService {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     return handleResponse<Order[]>(response);
+  }
+
+  async getDeliveredOrders(): Promise<ApiResponse<Order[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/admin/ordershistory`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse<Order[]>(response);
+  }
+
+  // Profile and address management
+  async updateProfile(profile: { name: string; email: string; phone: string }) {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(profile),
+    });
+    return handleResponse<User>(response);
+  }
+
+  async addAddress(address: Address) {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/address`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(address),
+    });
+    return handleResponse<User>(response);
+  }
+
+  async updateAddress(addressId: string, address: Address) {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/address/${addressId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(address),
+    });
+    return handleResponse<User>(response);
+  }
+
+  async deleteAddress(addressId: string) {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/address/${addressId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<User>(response);
+  }
+
+  async getUserNotifications(): Promise<ApiResponse<Order[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user-notifications`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<Order[]>(response);
+  }
+
+  // Fetch all users (admin only)
+  async getAllUsers(): Promise<ApiResponse<User[]>> {
+    const response = await fetch(`${this.baseURL}/users`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return handleResponse<User[]>(response);
+  }
+
+  // Delete a user (admin only)
+  async deleteUser(userId: string): Promise<ApiResponse<void>> {
+    const response = await fetch(`${this.baseURL}/users/${userId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return handleResponse<void>(response);
   }
 }
 
