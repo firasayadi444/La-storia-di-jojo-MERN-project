@@ -60,6 +60,8 @@ const AdminDashboard: React.FC = () => {
     estimatedDeliveryTime: ''
   });
   const [selectedDeliveryManId, setSelectedDeliveryManId] = React.useState('');
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [userTab, setUserTab] = useState<'all' | 'delivery'>('all');
 
   useEffect(() => {
     if (user?.role !== 'admin') return;
@@ -95,6 +97,14 @@ const AdminDashboard: React.FC = () => {
 
     fetchData();
   }, [user, toast]);
+
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+    apiService.getAllUsers().then(res => {
+      if (res.users) setAllUsers(res.users);
+      else if (res.data) setAllUsers(res.data);
+    });
+  }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -273,6 +283,12 @@ const AdminDashboard: React.FC = () => {
     setIsOrderDialogOpen(true);
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    await apiService.deleteUser(userId);
+    setAllUsers(users => users.filter(u => u._id !== userId));
+  };
+
   if (user?.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -402,6 +418,45 @@ const AdminDashboard: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* User Management Section */}
+        <div className="mb-10">
+          <div className="flex items-center gap-4 mb-4">
+            <h2 className="text-2xl font-semibold text-italian-green-700">User Management</h2>
+            <div className="ml-auto flex gap-2">
+              <Button variant={userTab === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setUserTab('all')}>All Users</Button>
+              <Button variant={userTab === 'delivery' ? 'default' : 'outline'} size="sm" onClick={() => setUserTab('delivery')}>Delivery Men</Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-lg shadow bg-white">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                  <th className="px-4 py-2"></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {(userTab === 'all' ? allUsers : allUsers.filter(u => u.role === 'delivery')).map(u => (
+                  <tr key={u._id}>
+                    <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-800">{u.name}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-gray-600">{u.email}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded text-xs font-semibold ${u.role === 'admin' ? 'bg-blue-100 text-blue-700' : u.role === 'delivery' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{u.role}</span>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-gray-600">{u.phone || '-'}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-right">
+                      <Button variant="destructive" size="sm" onClick={() => handleDeleteUser(u._id)}>Delete</Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

@@ -95,6 +95,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setToken(null);
     clearAuthData();
+    // Also clear cart when user logs out
+    localStorage.removeItem('cart');
   };
 
   const refreshUser = () => {

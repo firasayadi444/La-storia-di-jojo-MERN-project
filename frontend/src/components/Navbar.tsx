@@ -30,6 +30,12 @@ const Navbar: React.FC = () => {
 
   const [newOrdersCount, setNewOrdersCount] = useState(0);
   const [newDeliveryMenCount, setNewDeliveryMenCount] = useState(0);
+  const [userNotifications, setUserNotifications] = useState<Order[]>([]);
+  const [userNotificationsCount, setUserNotificationsCount] = useState(0);
+
+  // Split user notifications for dropdown
+  const activeUserNotifications = userNotifications.filter(n => n.status !== 'delivered');
+  const historyUserNotifications = userNotifications.filter(n => n.status === 'delivered' || n.status === 'cancelled');
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -46,8 +52,14 @@ const Navbar: React.FC = () => {
           } else if (user?.role === 'delivery') {
             // Fetch delivery notifications
             const notificationsRes = await apiService.getDeliveryNotifications();
-            const notifications = notificationsRes.notifications || notificationsRes.data || [];
+            const notifications = notificationsRes.data || notificationsRes.orders || [];
             setDeliveryNotificationsCount(notifications.length);
+          } else if (user?.role === 'user') {
+            // Fetch user notifications
+            const notificationsRes = await apiService.getUserNotifications();
+            const notifications = notificationsRes.data || [];
+            setUserNotifications(notifications);
+            setUserNotificationsCount(notifications.length);
           }
         } catch (err) {
           // Optionally handle error
@@ -96,7 +108,6 @@ const Navbar: React.FC = () => {
             <img src="/logo.png" alt="LaStoria Di JoJo Logo" className="w-10 h-10 rounded-full shadow-md bg-white object-contain p-1" />
             <div className="flex flex-col">
               <span className="font-serif font-bold text-xl text-gradient">LaStoria Di JoJo</span>
-              <span className="text-xs text-italian-green-600 font-medium -mt-1">Authentic Italian</span>
             </div>
           </Link>
 
@@ -115,34 +126,34 @@ const Navbar: React.FC = () => {
             </Link>
 
             {isAuthenticated && user?.role === 'user' && (
-              <Link
-                to="/orders"
-                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive('/orders') 
-                    ? 'text-italian-green-700 bg-italian-green-50' 
-                    : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
-                }`}
-              >
-                <Clock className="h-4 w-4" />
-                <span>My Orders</span>
-              </Link>
+              <>
+                <Link
+                  to="/orders"
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive('/orders') 
+                      ? 'text-italian-green-700 bg-italian-green-50' 
+                      : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
+                  }`}
+                >
+                  <Clock className="h-4 w-4" />
+                  <span>My Orders</span>
+                </Link>
+                <Link
+                  to="/orders/history"
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive('/orders/history') 
+                      ? 'text-italian-green-700 bg-italian-green-50' 
+                      : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
+                  }`}
+                >
+                  <Inbox className="h-4 w-4" />
+                  <span>Order History</span>
+                </Link>
+              </>
             )}
 
             {isAuthenticated && (
               <>
-                {user?.role === 'user' && (
-                  <Link
-                    to="/dashboard"
-                    className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive('/dashboard') 
-                        ? 'text-italian-green-700 bg-italian-green-50' 
-                        : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'
-                    }`}
-                  >
-                    <BarChart2 className="h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Link>
-                )}
                 {user?.role === 'admin' && (
                   <>
                     <Link to="/admin/feedbacks" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/feedbacks') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
@@ -170,6 +181,11 @@ const Navbar: React.FC = () => {
                       {newOrdersCount > 0 && (
                         <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white">{newOrdersCount}</span>
                       )}
+                    </Link>
+                    <Link to="/admin/ordershistory" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/ordershistory') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}
+                      style={{ borderLeft: isActive('/admin/ordershistory') ? '4px solid #16a34a' : undefined }}>
+                      <Clock className="h-4 w-4" />
+                      <span>Order History</span>
                     </Link>
                   </>
                 )}
@@ -240,6 +256,51 @@ const Navbar: React.FC = () => {
               </Link>
             )}
 
+            {/* User Notifications */}
+            {isAuthenticated && user?.role === 'user' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative p-2">
+                    <Bell className="h-6 w-6 text-gray-600" />
+                    {userNotificationsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-600 text-white text-xs flex items-center justify-center p-0">
+                        {userNotificationsCount}
+                      </span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 bg-white border shadow-lg">
+                  <div className="p-2 font-semibold text-gray-700 border-b">Order Updates</div>
+                  {/* Active Orders Section */}
+                  <div className="px-2 pt-2 pb-1 text-sm font-bold text-italian-green-700">Active Orders</div>
+                  {activeUserNotifications.length === 0 ? (
+                    <div className="px-4 pb-2 text-gray-500 text-sm">No active order notifications</div>
+                  ) : (
+                    activeUserNotifications.slice(0, 5).map((notif) => (
+                      <div key={notif._id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
+                        <div className="font-medium">Order #{notif._id.slice(-6)}</div>
+                        <div className="text-xs text-gray-600">Status: {notif.status.replace('_', ' ')}</div>
+                        <div className="text-xs text-gray-500">Updated: {new Date(notif.updatedAt).toLocaleString()}</div>
+                      </div>
+                    ))
+                  )}
+                  {/* Order History Section */}
+                  <div className="px-2 pt-2 pb-1 text-sm font-bold text-italian-green-700">Order History</div>
+                  {historyUserNotifications.length === 0 ? (
+                    <div className="px-4 pb-2 text-gray-500 text-sm">No order history notifications</div>
+                  ) : (
+                    historyUserNotifications.slice(0, 5).map((notif) => (
+                      <div key={notif._id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
+                        <div className="font-medium">Order #{notif._id.slice(-6)}</div>
+                        <div className="text-xs text-gray-600">Status: {notif.status.replace('_', ' ')}</div>
+                        <div className="text-xs text-gray-500">Updated: {new Date(notif.updatedAt).toLocaleString()}</div>
+                      </div>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             {/* User Menu */}
             {isAuthenticated ? (
               <DropdownMenu>
@@ -265,6 +326,14 @@ const Navbar: React.FC = () => {
                       <Link to="/delivery" className="flex items-center space-x-2 px-3 py-2">
                         <Truck className="h-4 w-4" />
                         <span>Delivery Management</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {user?.role === 'user' && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile" className="flex items-center space-x-2 px-3 py-2">
+                        <User className="h-4 w-4" />
+                        <span>Profile</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -315,6 +384,16 @@ const Navbar: React.FC = () => {
                 >
                   <Clock className="h-4 w-4" />
                   <span>My Orders</span>
+                </Link>
+              )}
+              {isAuthenticated && user?.role === 'user' && (
+                <Link
+                  to="/profile"
+                  className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <User className="h-4 w-4" />
+                  <span>Profile</span>
                 </Link>
               )}
               {isAuthenticated && (

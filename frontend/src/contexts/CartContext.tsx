@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Food } from '../services/api';
+import { useAuth } from './AuthContext';
 
 interface CartItem {
   food: Food;
@@ -32,6 +33,7 @@ interface CartProviderProps {
 
 export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
+  const { isAuthenticated, user } = useAuth();
 
   // Load cart from localStorage on mount
   useEffect(() => {
@@ -46,12 +48,27 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // Clear cart when user is not authenticated or not a regular user
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== 'user') {
+      setItems([]);
+      localStorage.removeItem('cart');
+    }
+  }, [isAuthenticated, user?.role]);
+
   // Save cart to localStorage whenever items change
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(items));
-  }, [items]);
+    if (isAuthenticated && user?.role === 'user') {
+      localStorage.setItem('cart', JSON.stringify(items));
+    }
+  }, [items, isAuthenticated, user?.role]);
 
   const addToCart = (food: Food, quantity: number = 1) => {
+    // Only allow adding to cart if user is authenticated and is a regular user
+    if (!isAuthenticated || user?.role !== 'user') {
+      return;
+    }
+
     setItems(prevItems => {
       const existingItem = prevItems.find(item => item.food._id === food._id);
       

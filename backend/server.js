@@ -20,21 +20,28 @@ if (process.env.NODE_ENV !== 'test') {
 
 app.use(bodyParser.json());
 app.use(cors({
-  origin: [
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost and any local network IP
+    const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:8080',
     'http://localhost:8081',
-    'http://localhost:8082',
-    'http://192.168.100.96:8080',
-    'http://192.168.100.96:8081',
-    'http://192.168.100.96:8082',
-    'http://192.168.245.1:8080',
-    'http://192.168.245.1:8081',
-    'http://192.168.245.1:8082',
-    'http://192.168.119.1:8080',
-    'http://192.168.119.1:8081',
-    'http://192.168.119.1:8082'
-  ],
+      'http://localhost:8082'
+    ];
+    
+    // Check if origin is localhost or local network IP
+    if (allowedOrigins.includes(origin) || 
+        origin.match(/^http:\/\/192\.168\.\d+\.\d+:\d+$/) ||
+        origin.match(/^http:\/\/172\.\d+\.\d+\.\d+:\d+$/) ||
+        origin.match(/^http:\/\/10\.\d+\.\d+\.\d+:\d+$/)) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
