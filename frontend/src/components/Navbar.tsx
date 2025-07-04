@@ -168,13 +168,36 @@ const Navbar: React.FC = () => {
                       <BarChart2 className="h-4 w-4" />
                       <span>History & Financials</span>
                     </Link>
-                    <Link to="/admin/deliverymen" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/deliverymen') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
-                      <Users className="h-4 w-4" />
-                      <span>Delivery Men</span>
-                      {newDeliveryMenCount > 0 && (
-                        <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white">{newDeliveryMenCount}</span>
-                      )}
-                    </Link>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/deliverymen') || isActive('/admin/users') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
+                          <Users className="h-4 w-4" />
+                          <span>Management</span>
+                          {newDeliveryMenCount > 0 && (
+                            <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white">{newDeliveryMenCount}</span>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48 bg-white border shadow-lg">
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/users" className="flex items-center space-x-2 px-3 py-2">
+                            <Users className="h-4 w-4" />
+                            <span>User Management</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/deliverymen" className="flex items-center space-x-2 px-3 py-2">
+                            <Truck className="h-4 w-4" />
+                            <span>Delivery Men</span>
+                            {newDeliveryMenCount > 0 && (
+                              <Badge className="ml-auto bg-red-500 text-white text-xs">
+                                {newDeliveryMenCount}
+                              </Badge>
+                            )}
+                          </Link>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Link to="/admin/orders" className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/admin/orders') ? 'text-italian-green-700 bg-italian-green-50' : 'text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50'}`}>
                       <Inbox className="h-4 w-4" />
                       <span>Orders</span>
@@ -301,6 +324,8 @@ const Navbar: React.FC = () => {
               </DropdownMenu>
             )}
 
+
+
             {/* User Menu */}
             {isAuthenticated ? (
               <DropdownMenu>
@@ -425,6 +450,46 @@ const Navbar: React.FC = () => {
                     >
                       <Truck className="h-4 w-4" />
                       <span>Delivery</span>
+                    </Link>
+                  )}
+                  {user?.role === 'admin' && (
+                    <Link
+                      to="/admin/users"
+                      className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <Users className="h-4 w-4" />
+                      <span>User Management</span>
+                    </Link>
+                  )}
+                  {user?.role === 'admin' && (
+                    <Link
+                      to="/admin/deliverymen"
+                      className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <Truck className="h-4 w-4" />
+                      <span>Delivery Men</span>
+                    </Link>
+                  )}
+                  {user?.role === 'admin' && (
+                    <Link
+                      to="/admin/feedbacks"
+                      className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Feedbacks</span>
+                    </Link>
+                  )}
+                  {user?.role === 'admin' && (
+                    <Link
+                      to="/admin/analytics"
+                      className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-italian-green-700 hover:bg-italian-cream-50"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <BarChart2 className="h-4 w-4" />
+                      <span>Analytics</span>
                     </Link>
                   )}
                 </>
