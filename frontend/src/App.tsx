@@ -20,6 +20,7 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminUsers from "./pages/AdminUsers";
 import DeliveryDashboard from "./pages/DeliveryDashboard";
 import NotFound from "./pages/NotFound";
 import AdminOrders from './pages/AdminOrders';
@@ -62,6 +63,7 @@ const App = () => (
                         <Route path="/delivery" element={<ProtectedRoute requireAuth requireDelivery><DeliveryDashboard /></ProtectedRoute>} />
                         <Route path="/delivery-stats" element={<ProtectedRoute requireAuth requireDelivery><DeliveryStats /></ProtectedRoute>} />
                         <Route path="/admin/orders" element={<ProtectedRoute requireAuth requireAdmin><AdminOrders /></ProtectedRoute>} />
+                        <Route path="/admin/users" element={<ProtectedRoute requireAuth requireAdmin><AdminUsers /></ProtectedRoute>} />
                         <Route path="/admin/deliverymen" element={<ProtectedRoute requireAuth requireAdmin><AdminDeliverymen /></ProtectedRoute>} />
                         <Route path="/admin/feedbacks" element={<ProtectedRoute requireAuth requireAdmin><AdminFeedbacks /></ProtectedRoute>} />
                         <Route path="/admin/analytics" element={<ProtectedRoute requireAuth requireAdmin><AdminAnalytics /></ProtectedRoute>} />

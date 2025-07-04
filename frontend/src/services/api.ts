@@ -512,20 +512,27 @@ class ApiService {
 
   // Fetch all users (admin only)
   async getAllUsers(): Promise<ApiResponse<User[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
     const response = await fetch(`${this.baseURL}/users`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
     return handleResponse<User[]>(response);
   }
 
   // Delete a user (admin only)
   async deleteUser(userId: string): Promise<ApiResponse<void>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
     const response = await fetch(`${this.baseURL}/users/${userId}`, {
       method: 'DELETE',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
     return handleResponse<void>(response);
   }

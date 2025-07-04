@@ -3,8 +3,8 @@ const { authMiddleware, adminAuthMiddleware } = require("../middlewares/authMidd
 const userController = require("../controllers/userController");
 const router = express.Router();
 
-router.get("/users", userController.getAllUser);
-router.delete("/user/:id", userController.deleteUser);
+router.get("/users", adminAuthMiddleware, userController.getAllUser);
+router.delete("/users/:id", adminAuthMiddleware, userController.deleteUser);
 
 // User profile management
 router.put("/user/profile", authMiddleware, userController.updateProfile);
