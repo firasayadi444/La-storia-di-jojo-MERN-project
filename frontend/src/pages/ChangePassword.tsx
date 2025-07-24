@@ -122,12 +122,6 @@ const ChangePassword: React.FC = () => {
                 {isLoading ? 'Changing Password...' : 'Change Password'}
               </Button>
             </form>
-            
-            <div className="mt-6 p-3 bg-blue-50 rounded-md">
-              <p className="text-sm text-blue-700">
-                <strong>Note:</strong> This is your first login. You must change your temporary password to continue using the application.
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>

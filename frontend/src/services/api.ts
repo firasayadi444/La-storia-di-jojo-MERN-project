@@ -53,6 +53,7 @@ export interface Order {
   deliveryRating?: number;
   foodRating?: number;
   feedbackComment?: string;
+  assignedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -81,9 +82,44 @@ export interface ApiResponse<T> {
   order?: Order;
 }
 
+export interface Address {
+  _id?: string;
+  label: string;
+  address: string;
+  googleMapLink?: string;
+  isDefault?: boolean;
+}
+
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
-  return localStorage.getItem('token');
+  return localStorage.getItem('token') || sessionStorage.getItem('token');
+};
+
+// Helper function to validate token before making requests
+const validateToken = (): boolean => {
+  const token = getAuthToken();
+  if (!token) {
+    return false;
+  }
+  
+  try {
+    // Simple token validation without external dependency
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const currentTime = Date.now() / 1000;
+    if (payload.exp < currentTime) {
+      // Clear expired token
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Error validating token:', error);
+    // Clear invalid token
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    return false;
+  }
 };
 
 // Helper function to handle API responses
@@ -133,8 +169,8 @@ class ApiService {
     newPassword: string;
     confirmPassword: string;
   }): Promise<ApiResponse<void>> {
+    if (!validateToken()) throw new Error('Authentication required');
     const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/change-password`, {
       method: 'POST',
@@ -159,8 +195,8 @@ class ApiService {
   }
 
   async addFood(foodData: FormData): Promise<ApiResponse<Food>> {
+    if (!validateToken()) throw new Error('Authentication required');
     const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/food/new`, {
       method: 'POST',
@@ -174,8 +210,8 @@ class ApiService {
   }
 
   async updateFood(id: string, foodData: Partial<Food>): Promise<ApiResponse<Food>> {
+    if (!validateToken()) throw new Error('Authentication required');
     const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/food/${id}`, {
       method: 'PUT',
@@ -189,8 +225,8 @@ class ApiService {
   }
 
   async deleteFood(id: string): Promise<ApiResponse<void>> {
+    if (!validateToken()) throw new Error('Authentication required');
     const token = getAuthToken();
-    if (!token) throw new Error('Authentication required');
 
     const response = await fetch(`${this.baseURL}/food/${id}`, {
       method: 'DELETE',
@@ -397,6 +433,108 @@ class ApiService {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     return handleResponse<Order[]>(response);
+  }
+
+  async getDeliveredOrders(): Promise<ApiResponse<Order[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/admin/ordershistory`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse<Order[]>(response);
+  }
+
+  // Profile and address management
+  async updateProfile(profile: { name: string; email: string; phone: string }) {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(profile),
+    });
+    return handleResponse<User>(response);
+  }
+
+  async addAddress(address: Address) {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/address`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(address),
+    });
+    return handleResponse<User>(response);
+  }
+
+  async updateAddress(addressId: string, address: Address) {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/address/${addressId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(address),
+    });
+    return handleResponse<User>(response);
+  }
+
+  async deleteAddress(addressId: string) {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/address/${addressId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<User>(response);
+  }
+
+  async getUserNotifications(): Promise<ApiResponse<Order[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user-notifications`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<Order[]>(response);
+  }
+
+  // Fetch all users (admin only)
+  async getAllUsers(): Promise<ApiResponse<User[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/users`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    return handleResponse<User[]>(response);
+  }
+
+  // Delete a user (admin only)
+  async deleteUser(userId: string): Promise<ApiResponse<void>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/users/${userId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    return handleResponse<void>(response);
   }
 }
 

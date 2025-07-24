@@ -214,6 +214,9 @@ const orderController = {
           return res.status(400).json({ message: "Selected delivery man is not available" });
         }
         updateData.deliveryMan = deliveryManId;
+        if (status === 'ready') {
+          updateData.assignedAt = new Date();
+        }
         if (estimatedDeliveryTime) {
           updateData.estimatedDeliveryTime = new Date(estimatedDeliveryTime);
         }
@@ -377,6 +380,41 @@ const orderController = {
         .sort({ createdAt: -1 });
       res.status(200).json({ orders });
     } catch (error) {
+      return res.status(500).json({ message: error.message });
+    }
+  },
+
+  getDeliveredOrders: async (req, res) => {
+    try {
+      const orders = await Orders.find({ status: 'delivered' })
+        .populate('user', 'name email')
+        .populate('items.food', 'name price image category')
+        .populate('deliveryMan', 'name phone');
+      res.status(200).json({ orders });
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
+    }
+  },
+
+  // Get user notifications (order status changes)
+  getUserNotifications: async (req, res) => {
+    try {
+      const userId = req.user._id;
+      // Get recent orders for this user that are not delivered/cancelled
+      const notifications = await Orders.find({
+        user: userId,
+        status: { $nin: ['delivered', 'cancelled'] }
+      })
+        .populate('items.food', 'name price image category')
+        .sort({ updatedAt: -1 })
+        .limit(10);
+      res.status(200).json({
+        message: 'User notifications retrieved successfully',
+        data: notifications,
+        notifications: notifications
+      });
+    } catch (error) {
+      console.error('Error in getUserNotifications:', error);
       return res.status(500).json({ message: error.message });
     }
   },

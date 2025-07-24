@@ -5,14 +5,7 @@ const bcrypt = require("bcrypt");
 require("dotenv").config();
 
 const sampleFoods = [
-  {
-    name: "Margherita Pizza",
-    category: "Pizza",
-    price: 12.99,
-    description: "Fresh tomato sauce, mozzarella, and basil on a crispy crust",
-    image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop",
-    available: true
-  },
+
   {
     name: "Classic Burger",
     category: "Burgers",
@@ -21,14 +14,7 @@ const sampleFoods = [
     image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop",
     available: true
   },
-  {
-    name: "Chicken Teriyaki",
-    category: "Asian",
-    price: 14.99,
-    description: "Grilled chicken glazed with teriyaki sauce, served with steamed rice",
-    image: "https://images.unsplash.com/photo-1607330289090-7e7c1e5b5b4b?w=400&h=300&fit=crop",
-    available: true
-  },
+
   {
     name: "Caesar Salad",
     category: "Salads",
@@ -37,30 +23,9 @@ const sampleFoods = [
     image: "https://images.unsplash.com/photo-1551248429-40975aa4de74?w=400&h=300&fit=crop",
     available: true
   },
-  {
-    name: "Spaghetti Carbonara",
-    category: "Pasta",
-    price: 13.99,
-    description: "Creamy pasta with pancetta, eggs, parmesan, and black pepper",
-    image: "https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=400&h=300&fit=crop",
-    available: true
-  },
-  {
-    name: "Fish Tacos",
-    category: "Mexican",
-    price: 11.99,
-    description: "Grilled fish with cabbage slaw, salsa, and cilantro lime crema",
-    image: "https://images.unsplash.com/photo-1565299585323-38174c6339cd?w=400&h=300&fit=crop",
-    available: true
-  },
-  {
-    name: "Chicken Wings",
-    category: "Appetizers",
-    price: 10.99,
-    description: "Crispy wings tossed in your choice of sauce",
-    image: "https://images.unsplash.com/photo-1567620832904-9fe5cf1682f0?w=400&h=300&fit=crop",
-    available: true
-  },
+
+
+
   {
     name: "Chocolate Cake",
     category: "Desserts",
@@ -184,6 +149,95 @@ const seedDatabase = async () => {
       },
       status: "pending"
     });
+
+    // Add sample delivered orders in different months for analytics
+    const foods = await Foods.find();
+    const users = await Users.find({ role: 'user' });
+    const deliveryMen = await Users.find({ role: 'delivery', status: 'active' });
+    const Orders = require('./models/orderModel');
+    await Orders.deleteMany({});
+
+    const monthsAgo = (n) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - n);
+      return d;
+    };
+
+    const sampleOrders = [
+      {
+        user: users[0]._id,
+        items: [
+          { food: foods[0]._id, quantity: 2, price: foods[0].price },
+          { food: foods[1]._id, quantity: 1, price: foods[1].price }
+        ],
+        totalAmount: foods[0].price * 2 + foods[1].price,
+        status: 'delivered',
+        deliveryAddress: '456 User Avenue, City',
+        deliveryMan: deliveryMen[0]._id,
+        estimatedDeliveryTime: monthsAgo(3),
+        actualDeliveryTime: monthsAgo(3),
+        createdAt: monthsAgo(3),
+        updatedAt: monthsAgo(3)
+      },
+      {
+        user: users[0]._id,
+        items: [
+          { food: foods[2]._id, quantity: 3, price: foods[2].price }
+        ],
+        totalAmount: foods[2].price * 3,
+        status: 'delivered',
+        deliveryAddress: '456 User Avenue, City',
+        deliveryMan: deliveryMen[1]._id,
+        estimatedDeliveryTime: monthsAgo(2),
+        actualDeliveryTime: monthsAgo(2),
+        createdAt: monthsAgo(2),
+        updatedAt: monthsAgo(2)
+      },
+      {
+        user: users[0]._id,
+        items: [
+          { food: foods[1]._id, quantity: 1, price: foods[1].price }
+        ],
+        totalAmount: foods[1].price,
+        status: 'delivered',
+        deliveryAddress: '456 User Avenue, City',
+        deliveryMan: deliveryMen[2]._id,
+        estimatedDeliveryTime: monthsAgo(1),
+        actualDeliveryTime: monthsAgo(1),
+        createdAt: monthsAgo(1),
+        updatedAt: monthsAgo(1)
+      },
+      {
+        user: users[0]._id,
+        items: [
+          { food: foods[0]._id, quantity: 1, price: foods[0].price }
+        ],
+        totalAmount: foods[0].price,
+        status: 'delivered',
+        deliveryAddress: '789 New Street, City',
+        deliveryMan: deliveryMen[0]._id,
+        estimatedDeliveryTime: monthsAgo(5),
+        actualDeliveryTime: monthsAgo(5),
+        createdAt: monthsAgo(5),
+        updatedAt: monthsAgo(5)
+      },
+      {
+        user: users[0]._id,
+        items: [
+          { food: foods[2]._id, quantity: 2, price: foods[2].price }
+        ],
+        totalAmount: foods[2].price * 2,
+        status: 'delivered',
+        deliveryAddress: '123 Another Ave, City',
+        deliveryMan: deliveryMen[1]._id,
+        estimatedDeliveryTime: monthsAgo(4),
+        actualDeliveryTime: monthsAgo(4),
+        createdAt: monthsAgo(4),
+        updatedAt: monthsAgo(4)
+      }
+    ];
+    await Orders.insertMany(sampleOrders);
+    console.log('Sample delivered orders added for analytics.');
 
     console.log("Database seeded successfully!");
     console.log(`👥 Users created: ${await Users.countDocuments()}`);

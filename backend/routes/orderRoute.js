@@ -27,4 +27,8 @@ router.get('/orders/delivery/history', authMiddleware, orderController.getDelive
 // router.put('/:id/rate-food', authMiddleware, orderController.rateFood);
 // router.put('/:id/feedback', authMiddleware, orderController.addFeedback);
 
+router.get('/admin/ordershistory', adminAuthMiddleware, orderController.getDeliveredOrders);
+
+router.get('/user-notifications', authMiddleware, orderController.getUserNotifications);
+
 module.exports = router;

@@ -3,6 +3,7 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const { readdirSync } = require("fs");
 const connectDatabase = require("./utils/database");
+const initDatabase = require("./init-db");
 const app = express();
 
 require("dotenv").config();
@@ -15,26 +16,35 @@ if (!process.env.DB) {
 
 // Only connect to database if not in test environment
 if (process.env.NODE_ENV !== 'test') {
-  connectDatabase();
+  // Initialize database with indexes and seed data
+  initDatabase();
 }
 
 app.use(bodyParser.json());
 app.use(cors({
-  origin: [
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost and any local network IP
+    const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:8080',
     'http://localhost:8081',
-    'http://localhost:8082',
-    'http://192.168.100.96:8080',
-    'http://192.168.100.96:8081',
-    'http://192.168.100.96:8082',
-    'http://192.168.245.1:8080',
-    'http://192.168.245.1:8081',
-    'http://192.168.245.1:8082',
-    'http://192.168.119.1:8080',
-    'http://192.168.119.1:8081',
-    'http://192.168.119.1:8082'
-  ],
+      'http://localhost:8082',
+      'http://localhost:3000'
+    ];
+    
+    // Check if origin is localhost or local network IP
+    if (allowedOrigins.includes(origin) || 
+        origin.match(/^http:\/\/192\.168\.\d+\.\d+:\d+$/) ||
+        origin.match(/^http:\/\/172\.\d+\.\d+\.\d+:\d+$/) ||
+        origin.match(/^http:\/\/10\.\d+\.\d+\.\d+:\d+$/)) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -54,6 +64,20 @@ if (process.env.NODE_ENV !== 'test') {
 // Test route to check if server is working
 app.get('/test', (req, res) => {
   res.status(200).json({ message: 'Server is working' });
+});
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const healthCheck = require('./health-check');
+    const result = await healthCheck();
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'unhealthy', 
+      error: error.message 
+    });
+  }
 });
 
 // Mount routes in specific order to avoid conflicts

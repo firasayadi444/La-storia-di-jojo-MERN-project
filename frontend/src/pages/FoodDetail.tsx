@@ -74,6 +74,7 @@ const FoodDetail: React.FC = () => {
         description: "Join our famiglia to add delicious items to your cart",
         variant: "destructive"
       });
+      navigate('/login');
       return;
     }
 

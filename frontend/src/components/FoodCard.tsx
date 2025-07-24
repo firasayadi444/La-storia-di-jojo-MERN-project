@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Food } from '../services/api';
 import { useCart } from '../contexts/CartContext';
@@ -16,6 +16,7 @@ const FoodCard: React.FC<FoodCardProps> = ({ food }) => {
   const { addToCart } = useCart();
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleAddToCart = () => {
     if (!isAuthenticated) {
@@ -24,6 +25,7 @@ const FoodCard: React.FC<FoodCardProps> = ({ food }) => {
         description: "Join our famiglia to add delicious items to your cart",
         variant: "destructive"
       });
+      navigate('/login');
       return;
     }
 
