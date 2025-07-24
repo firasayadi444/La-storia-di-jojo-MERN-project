@@ -1,20 +1,58 @@
 pipeline {
     agent any
+
+    environment {
+        DOCKER_HUB_CREDENTIALS = 'docker-hub-creds'
+        DOCKER_HUB_REPO = 'firas444/pfe'
+        BACKEND_IMAGE = "${DOCKER_HUB_REPO}-backend"
+        FRONTEND_IMAGE = "${DOCKER_HUB_REPO}-frontend"
+    }
+
     stages {
-        stage('Backend Install') {
+        stage('Docker Login') {
             steps {
-                dir('backend') {
-                    sh 'npm ci'
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_HUB_CREDENTIALS) {
+                        echo 'Logged in to Docker Hub'
+                    }
                 }
             }
         }
-        stage('Frontend Install & Build') {
+
+        stage('Build Backend Image') {
+            steps {
+                dir('backend') {
+                    sh "docker build -t ${BACKEND_IMAGE}:latest ."
+                }
+            }
+        }
+
+        stage('Build Frontend Image') {
             steps {
                 dir('frontend') {
-                    sh 'npm ci'
-                    sh 'npm run build'
+                    sh "docker build -t ${FRONTEND_IMAGE}:latest ."
+                }
+            }
+        }
+
+        stage('Push Backend Image') {
+            steps {
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_HUB_CREDENTIALS) {
+                        sh "docker push ${BACKEND_IMAGE}:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Push Frontend Image') {
+            steps {
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_HUB_CREDENTIALS) {
+                        sh "docker push ${FRONTEND_IMAGE}:latest"
+                    }
                 }
             }
         }
     }
-} 
+}
