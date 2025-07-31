@@ -45,6 +45,33 @@ pipeline {
                     // Check Node.js and npm versions
                     sh 'node --version'
                     sh 'npm --version'
+                    // Verify Node.js version compatibility
+                    sh '''
+                        NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
+                        if [ "$NODE_VERSION" -lt 18 ]; then
+                            echo "❌ Node.js version $(node --version) is too old. Required: >=18"
+                            echo "Current version: $(node --version)"
+                            exit 1
+                        else
+                            echo "✅ Node.js version $(node --version) is compatible"
+                        fi
+                    '''
+                    // Check PATH and environment
+                    sh 'echo "PATH: $PATH"'
+                    sh 'which node'
+                    sh 'which npm'
+                    // Check if nvm is available and use it if needed
+                    sh '''
+                        if command -v nvm &> /dev/null; then
+                            echo "nvm found, using Node.js 22"
+                            export NVM_DIR="$HOME/.nvm"
+                            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                            nvm use 22 || nvm use 18 || nvm use 20
+                            echo "Active Node.js: $(node --version)"
+                        else
+                            echo "nvm not found, using system Node.js"
+                        fi
+                    '''
                     // Check available memory
                     sh 'free -h || echo "Memory info not available"'
                     // Check disk space
@@ -68,6 +95,9 @@ pipeline {
         stage('Test') {
             steps {
                 dir('backend') {
+                    // Clean npm cache and node_modules
+                    sh 'npm cache clean --force'
+                    sh 'rm -rf node_modules package-lock.json'
                     sh 'npm ci'
                     // Run diagnostic first
                     sh 'chmod +x test-diagnostic.sh && ./test-diagnostic.sh'
@@ -90,6 +120,9 @@ pipeline {
         stage('Frontend Test') {
             steps {
                 dir('frontend') {
+                    // Clean npm cache and node_modules
+                    sh 'npm cache clean --force'
+                    sh 'rm -rf node_modules package-lock.json'
                     sh 'npm ci'
                     // Run diagnostic first
                     sh 'chmod +x test-diagnostic.sh && ./test-diagnostic.sh'
