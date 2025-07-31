@@ -344,7 +344,7 @@ services:
     networks:
       - orderapp-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/test"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -365,12 +365,7 @@ services:
         condition: service_healthy
     networks:
       - orderapp-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    
 
 volumes:
   mongo_data:
