@@ -12,12 +12,48 @@ pipeline {
     }
 
     stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    // Explicit checkout
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/main']],
+                        userRemoteConfigs: [[
+                            url: 'https://github.com/firasayadi444/La-storia-di-jojo-MERN-project.git',
+                            credentialsId: 'github-credentials'
+                        ]]
+                    ])
+                    // Verify checkout
+                    sh 'git --version'
+                    sh 'git log --oneline -3'
+                    sh 'ls -la'
+                }
+            }
+        }
+
         stage('Cache Setup') {
             steps {
                 script {
                     // Create cache directories
                     sh 'mkdir -p backend/.npm frontend/.npm'
                     sh 'mkdir -p backend/.docker frontend/.docker'
+                    // Create test directories
+                    sh 'mkdir -p backend/coverage frontend/coverage'
+                }
+            }
+        }
+
+        stage('Environment Check') {
+            steps {
+                script {
+                    // Check Node.js and npm versions
+                    sh 'node --version'
+                    sh 'npm --version'
+                    // Check available memory
+                    sh 'free -h || echo "Memory info not available"'
+                    // Check disk space
+                    sh 'df -h'
                 }
             }
         }
@@ -37,7 +73,26 @@ pipeline {
         stage('Test') {
             steps {
                 dir('backend') {
-                    sh 'npm run test:ci'
+                    // Cache npm dependencies
+                    cache(maxCacheSize: 250, caches: [
+                        arbitraryFileCache(path: 'node_modules', includes: '**/*')
+                    ]) {
+                        sh 'npm ci --cache .npm --prefer-offline'
+                    }
+                    // Run diagnostic first
+                    sh 'chmod +x test-diagnostic.sh && ./test-diagnostic.sh'
+                    // Run tests with timeout and error handling
+                    timeout(time: 10, unit: 'MINUTES') {
+                        sh 'npm run test:ci'
+                    }
+                }
+            }
+            post {
+                always {
+                    // Publish test results
+                    publishTestResults testResultsPattern: '**/test-results.xml'
+                    // Archive test coverage
+                    archiveArtifacts artifacts: 'coverage/**/*'
                 }
             }
         }
@@ -51,7 +106,20 @@ pipeline {
                     ]) {
                         sh 'npm ci --cache .npm --prefer-offline'
                     }
-                    sh 'npm run test:ci'
+                    // Run diagnostic first
+                    sh 'chmod +x test-diagnostic.sh && ./test-diagnostic.sh'
+                    // Run tests with timeout and error handling
+                    timeout(time: 10, unit: 'MINUTES') {
+                        sh 'npm run test:ci'
+                    }
+                }
+            }
+            post {
+                always {
+                    // Publish test results
+                    publishTestResults testResultsPattern: '**/test-results.xml'
+                    // Archive test coverage
+                    archiveArtifacts artifacts: 'coverage/**/*'
                 }
             }
         }
