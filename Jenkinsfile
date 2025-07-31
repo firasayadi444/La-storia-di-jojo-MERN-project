@@ -199,10 +199,6 @@ pipeline {
           sh 'find . -name "node_modules" -type d -exec du -sh {} \\; | head -5'
         }
       }
-      failure {
-        mail to: 'dev@tondomaine.com',
-             subject: "Échec pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-             body: "Voir les logs Jenkins : ${env.BUILD_URL}"
-      }
+      
     }
 }
