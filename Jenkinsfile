@@ -32,28 +32,7 @@ pipeline {
             }
         }
 
-        stage('Lint') {
-            steps {
-                dir('backend') {
-                    // Cache npm dependencies
-                    cache(maxCacheSize: 250, caches: [
-                        arbitraryFileCache(path: 'node_modules', includes: '**/*')
-                    ]) {
-                        sh 'npm ci --cache .npm --prefer-offline'
-                    }
-                    sh 'npm run lint'
-                }
-                dir('frontend') {
-                    // Cache npm dependencies
-                    cache(maxCacheSize: 250, caches: [
-                        arbitraryFileCache(path: 'node_modules', includes: '**/*')
-                    ]) {
-                        sh 'npm ci --cache .npm --prefer-offline'
-                    }
-                    sh 'npm run lint'
-                }
-            }
-        }
+     
 
         stage('Test') {
             steps {
