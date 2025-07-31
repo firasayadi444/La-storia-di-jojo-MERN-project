@@ -60,18 +60,7 @@ pipeline {
                     sh 'echo "PATH: $PATH"'
                     sh 'which node'
                     sh 'which npm'
-                    // Check if nvm is available and use it if needed
-                    sh '''
-                        if command -v nvm &> /dev/null; then
-                            echo "nvm found, using Node.js 22"
-                            export NVM_DIR="$HOME/.nvm"
-                            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-                            nvm use 22 || nvm use 18 || nvm use 20
-                            echo "Active Node.js: $(node --version)"
-                        else
-                            echo "nvm not found, using system Node.js"
-                        fi
-                    '''
+                    
                     // Check available memory
                     sh 'free -h || echo "Memory info not available"'
                     // Check disk space
