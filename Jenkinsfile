@@ -1,9 +1,8 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:22-alpine'
-            args '-u root -v /var/run/docker.sock:/var/run/docker.sock'
-        }
+    agent any
+
+    tools {
+        nodejs 'NodeJS 22' // Utilise la configuration Node.js de Jenkins
     }
 
     environment {
@@ -38,12 +37,6 @@ pipeline {
         stage('Setup') {
             steps {
                 script {
-                    // Install Docker in Alpine
-                    sh '''
-                        apk update
-                        apk add --no-cache docker-cli
-                    '''
-                    
                     // Create test directories
                     sh 'mkdir -p backend/coverage frontend/coverage'
                 }
@@ -53,7 +46,7 @@ pipeline {
         stage('Environment Check') {
             steps {
                 script {
-                    // Check Node.js and npm versions (already available in node:22-alpine)
+                    // Check Node.js and npm versions
                     sh 'node --version'
                     sh 'npm --version'
                     
@@ -257,11 +250,14 @@ pipeline {
             steps {
                 script {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        // Install Trivy
+                        // Install Trivy if not present
                         sh '''
-                            apk add --no-cache wget
-                            wget -qO- https://github.com/aquasecurity/trivy/releases/latest/download/trivy_Linux-64bit.tar.gz | tar xz
-                            mv trivy /usr/local/bin/
+                            if ! command -v trivy &> /dev/null; then
+                                echo "Installing Trivy..."
+                                wget -qO- https://github.com/aquasecurity/trivy/releases/latest/download/trivy_Linux-64bit.tar.gz | tar xz
+                                sudo mv trivy /usr/local/bin/ || mv trivy /tmp/
+                                export PATH="/tmp:$PATH"
+                            fi
                         '''
                         
                         // Scan backend image
