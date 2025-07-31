@@ -7,8 +7,8 @@ WORKDIR /app
 # 📄 Copie des fichiers package.json et package-lock.json
 COPY package*.json ./
 
-# 📥 Installation des dépendances (y compris devDependencies)
-RUN npm install
+# 📥 Installation des dépendances avec cache optimisé
+RUN npm ci --cache .npm --prefer-offline
 
 # 🗂️ Copie de tout le code source
 COPY . .
