@@ -7,8 +7,6 @@ pipeline {
         BACKEND_IMAGE = "${DOCKER_HUB_REPO}-backend"
         FRONTEND_IMAGE = "${DOCKER_HUB_REPO}-frontend"
         // SONAR_TOKEN = credentials('sonar-token')
-        NODE_CACHE_DIR = 'node_modules'
-        NPM_CACHE_DIR = '.npm'
     }
 
     stages {
@@ -32,12 +30,9 @@ pipeline {
             }
         }
 
-        stage('Cache Setup') {
+        stage('Setup') {
             steps {
                 script {
-                    // Create cache directories
-                    sh 'mkdir -p backend/.npm frontend/.npm'
-                    sh 'mkdir -p backend/.docker frontend/.docker'
                     // Create test directories
                     sh 'mkdir -p backend/coverage frontend/coverage'
                 }
@@ -73,12 +68,7 @@ pipeline {
         stage('Test') {
             steps {
                 dir('backend') {
-                    // Cache npm dependencies
-                    cache(maxCacheSize: 250, caches: [
-                        arbitraryFileCache(path: 'node_modules', includes: '**/*')
-                    ]) {
-                        sh 'npm ci --cache .npm --prefer-offline'
-                    }
+                    sh 'npm ci'
                     // Run diagnostic first
                     sh 'chmod +x test-diagnostic.sh && ./test-diagnostic.sh'
                     // Run tests with timeout and error handling
@@ -100,12 +90,7 @@ pipeline {
         stage('Frontend Test') {
             steps {
                 dir('frontend') {
-                    // Cache npm dependencies
-                    cache(maxCacheSize: 250, caches: [
-                        arbitraryFileCache(path: 'node_modules', includes: '**/*')
-                    ]) {
-                        sh 'npm ci --cache .npm --prefer-offline'
-                    }
+                    sh 'npm ci'
                     // Run diagnostic first
                     sh 'chmod +x test-diagnostic.sh && ./test-diagnostic.sh'
                     // Run tests with timeout and error handling
@@ -156,20 +141,10 @@ pipeline {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     dir('backend') {
-                        // Use cached node_modules
-                        cache(maxCacheSize: 250, caches: [
-                            arbitraryFileCache(path: 'node_modules', includes: '**/*')
-                        ]) {
-                            sh 'npm audit --audit-level=moderate'
-                        }
+                        sh 'npm audit --audit-level=moderate'
                     }
                     dir('frontend') {
-                        // Use cached node_modules
-                        cache(maxCacheSize: 250, caches: [
-                            arbitraryFileCache(path: 'node_modules', includes: '**/*')
-                        ]) {
-                            sh 'npm audit --audit-level=moderate'
-                        }
+                        sh 'npm audit --audit-level=moderate'
                     }
                 }
             }
@@ -180,12 +155,7 @@ pipeline {
                 script {
                     dir('backend') {
                         def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                        // Cache Docker layers
-                        cache(maxCacheSize: 250, caches: [
-                            arbitraryFileCache(path: '.docker', includes: '**/*')
-                        ]) {
-                            sh "docker build --cache-from ${BACKEND_IMAGE}:latest -t ${BACKEND_IMAGE}:${imageTag} ."
-                        }
+                        sh "docker build -t ${BACKEND_IMAGE}:${imageTag} ."
                     }
                 }
             }
@@ -195,12 +165,7 @@ pipeline {
             steps {
                 script {
                     dir('frontend') {
-                        // Cache Docker layers
-                        cache(maxCacheSize: 250, caches: [
-                            arbitraryFileCache(path: '.docker', includes: '**/*')
-                        ]) {
-                            sh "docker build --cache-from ${FRONTEND_IMAGE}:latest -t ${FRONTEND_IMAGE}:latest ."
-                        }
+                        sh "docker build -t ${FRONTEND_IMAGE}:latest ."
                     }
                 }
             }
@@ -239,13 +204,10 @@ pipeline {
     }
 
     post {
-      always {
-        script {
-          // Clean up cache if it gets too large
-          sh 'find . -name ".npm" -type d -exec du -sh {} \\; | head -5'
-          sh 'find . -name "node_modules" -type d -exec du -sh {} \\; | head -5'
-        }
+      failure {
+        mail to: 'dev@tondomaine.com',
+             subject: "Échec pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+             body: "Voir les logs Jenkins : ${env.BUILD_URL}"
       }
-      
     }
 }
