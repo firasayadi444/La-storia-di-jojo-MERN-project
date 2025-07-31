@@ -207,33 +207,7 @@ pipeline {
             }
         }
 
-        // stage('SonarQube Analysis') {
-        //     steps {
-        //         script {
-        //             // Backend SonarQube analysis
-        //             dir('backend') {
-        //                 withSonarQubeEnv('SonarQube') {
-        //                     sh '''
-        //                         sonar-scanner \
-        //                         -Dsonar.host.url=http://localhost:9000 \
-        //                         -Dsonar.login=${SONAR_TOKEN}
-        //                     '''
-        //                 }
-        //             }
-        //             
-        //             // Frontend SonarQube analysis
-        //             dir('frontend') {
-        //                 withSonarQubeEnv('SonarQube') {
-        //                     sh '''
-        //                         sonar-scanner \
-        //                         -Dsonar.host.url=http://localhost:9000 \
-        //                         -Dsonar.login=${SONAR_TOKEN}
-        //                     '''
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+       
 
         stage('Dependency Audit') {
             steps {
@@ -322,13 +296,188 @@ pipeline {
             }
         }
 
+        stage('Deploy with Docker Compose') {
+            steps {
+                script {
+                    // Create docker-compose.yml for deployment
+                    writeFile file: 'docker-compose.deploy.yml', text: """
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongo:
+    image: mongo:latest
+    container_name: orderapp-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=orderapp
+    networks:
+      - orderapp-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Backend API
+  backend:
+    image: ${BACKEND_IMAGE}:latest
+    container_name: orderapp-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - backend-uploads:/app/uploads
+    environment:
+      - NODE_ENV=production
+      - DB=mongodb://mongo:27017/orderapp
+      - JWT_SECRET=your-super-secret-jwt-key-2024
+      - PORT=5000
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - orderapp-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend React App
+  frontend:
+    image: ${FRONTEND_IMAGE}:latest
+    container_name: orderapp-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+      - NODE_ENV=development
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - orderapp-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mongo_data:
+  backend-uploads:
+
+networks:
+  orderapp-network:
+    driver: bridge
+"""
+
+                    // Stop existing containers if running
+                    sh '''
+                        echo "🛑 Stopping existing containers..."
+                        docker-compose -f docker-compose.deploy.yml down --remove-orphans || echo "No containers to stop"
+                    '''
+
+                    // Pull latest images
+                    sh '''
+                        echo "📥 Pulling latest images..."
+                        docker pull mongo:latest || echo "Failed to pull mongo image"
+                        docker pull ${BACKEND_IMAGE}:latest || echo "Failed to pull backend image"
+                        docker pull ${FRONTEND_IMAGE}:latest || echo "Failed to pull frontend image"
+                    '''
+
+                    // Deploy with docker-compose
+                    sh '''
+                        echo "🚀 Deploying application with MongoDB..."
+                        docker-compose -f docker-compose.deploy.yml up -d
+                    '''
+
+                    // Wait for services to be ready
+                    sh '''
+                        echo "⏳ Waiting for services to start..."
+                        echo "🗄️  MongoDB starting..."
+                        sleep 20
+                        echo "🔧 Backend starting..."
+                        sleep 25
+                        echo "⚛️  Frontend starting..."
+                        sleep 20
+                    '''
+
+                    // Check deployment status
+                    sh '''
+                        echo "✅ Checking deployment status..."
+                        docker-compose -f docker-compose.deploy.yml ps
+                        echo "📊 Container logs:"
+                        echo "=== MongoDB logs ==="
+                        docker logs orderapp-mongo --tail 10 || echo "MongoDB logs not available"
+                        echo "=== Backend logs ==="
+                        docker logs orderapp-backend --tail 15 || echo "Backend logs not available"
+                        echo "=== Frontend logs ==="
+                        docker logs orderapp-frontend --tail 15 || echo "Frontend logs not available"
+                    '''
+                }
+            }
+            post {
+                always {
+                    // Archive docker-compose file for reference
+                    archiveArtifacts artifacts: 'docker-compose.deploy.yml', allowEmptyArchive: true
+                }
+                success {
+                    echo '🎉 Deployment completed successfully!'
+                    script {
+                        // Basic health check with wget (available in alpine)
+                        sh '''
+                            echo "🏥 Running health checks..."
+                            echo "🗄️  Checking MongoDB..."
+                            docker exec orderapp-mongo mongosh --eval "db.adminCommand('ping')" || echo "⚠️ MongoDB health check failed"
+                            echo "🔧 Checking Backend API..."
+                            wget --spider --tries=3 --timeout=10 http://localhost:5000/ || echo "⚠️ Backend health check failed"
+                            echo "⚛️  Checking Frontend..."
+                            wget --spider --tries=3 --timeout=10 http://localhost:3000/ || echo "⚠️ Frontend health check failed"
+                            
+                            echo "🌐 Application URLs:"
+                            echo "Frontend: http://localhost:3000"
+                            echo "Backend API: http://localhost:5000/api"
+                            echo "MongoDB: mongodb://localhost:27017/orderapp"
+                        '''
+                    }
+                }
+                failure {
+                    echo '💥 Deployment failed!'
+                    script {
+                        // Show logs for debugging
+                        sh '''
+                            echo "📋 Deployment failure logs:"
+                            docker-compose -f docker-compose.deploy.yml logs --tail 50 || echo "No logs available"
+                            echo "🔍 Container status:"
+                            docker ps -a | grep orderapp || echo "No orderapp containers found"
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Cleanup') {
             steps {
                 script {
-                    // Clean up Docker images to save space
+                    // Clean up unused Docker images to save space
                     sh '''
+                        echo "🧹 Cleaning up unused Docker resources..."
                         docker image prune -f
                         docker system prune -f --volumes
+                        
+                        # Keep deployment compose file but clean other temp files
+                        echo "📁 Deployment files:"
+                        ls -la docker-compose.deploy.yml || echo "Compose file not found"
                     '''
                 }
             }
