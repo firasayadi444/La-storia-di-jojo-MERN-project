@@ -130,13 +130,15 @@ pipeline {
 
         stage('Build Backend Image') {
             steps {
-                dir('backend') {
-                    def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                    // Cache Docker layers
-                    cache(maxCacheSize: 250, caches: [
-                        arbitraryFileCache(path: '.docker', includes: '**/*')
-                    ]) {
-                        sh "docker build --cache-from ${BACKEND_IMAGE}:latest -t ${BACKEND_IMAGE}:${imageTag} ."
+                script {
+                    dir('backend') {
+                        def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                        // Cache Docker layers
+                        cache(maxCacheSize: 250, caches: [
+                            arbitraryFileCache(path: '.docker', includes: '**/*')
+                        ]) {
+                            sh "docker build --cache-from ${BACKEND_IMAGE}:latest -t ${BACKEND_IMAGE}:${imageTag} ."
+                        }
                     }
                 }
             }
@@ -144,12 +146,14 @@ pipeline {
 
         stage('Build Frontend Image') {
             steps {
-                dir('frontend') {
-                    // Cache Docker layers
-                    cache(maxCacheSize: 250, caches: [
-                        arbitraryFileCache(path: '.docker', includes: '**/*')
-                    ]) {
-                        sh "docker build --cache-from ${FRONTEND_IMAGE}:latest -t ${FRONTEND_IMAGE}:latest ."
+                script {
+                    dir('frontend') {
+                        // Cache Docker layers
+                        cache(maxCacheSize: 250, caches: [
+                            arbitraryFileCache(path: '.docker', includes: '**/*')
+                        ]) {
+                            sh "docker build --cache-from ${FRONTEND_IMAGE}:latest -t ${FRONTEND_IMAGE}:latest ."
+                        }
                     }
                 }
             }
