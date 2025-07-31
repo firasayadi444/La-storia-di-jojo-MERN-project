@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const Foods = require("./models/foodModel");
 const Users = require("./models/userModel");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 require("dotenv").config();
 
 const sampleFoods = [

@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const Users = require('../models/userModel');
 const Orders = require('../models/orderModel');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 

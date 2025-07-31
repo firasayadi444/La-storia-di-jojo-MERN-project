@@ -1,7 +1,7 @@
 const request = require('supertest');
 const app = require('../server');
 const User = require('../models/userModel');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 describe('Delivery Man Management Endpoints', () => {
   let adminUser, regularUser, deliveryMan;

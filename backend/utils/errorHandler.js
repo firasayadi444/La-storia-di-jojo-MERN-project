@@ -8,6 +8,7 @@ const registerValid = (name, email, password, cf_password) => {
   
   if (!password) return "Please enter your password";
   if (password.length < 6) return "Password must be at least 6 characters";
+  // eslint-disable-next-line security/detect-possible-timing-attacks
   if (password !== cf_password) return "Password did not match";
 };
 
