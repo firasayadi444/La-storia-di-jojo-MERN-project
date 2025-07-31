@@ -89,10 +89,20 @@ pipeline {
             steps {
                 dir('backend') {
                     script {
-                        // Clean npm cache and node_modules
+                        // Clean npm cache and node_modules but keep package-lock.json for ci
                         sh 'npm cache clean --force'
-                        sh 'rm -rf node_modules package-lock.json'
-                        sh 'npm ci'
+                        sh 'rm -rf node_modules'
+                        
+                        // Use npm ci if package-lock.json exists, otherwise npm install
+                        sh '''
+                            if [ -f package-lock.json ]; then
+                                echo "Using npm ci with existing package-lock.json"
+                                npm ci
+                            else
+                                echo "No package-lock.json found, using npm install"
+                                npm install
+                            fi
+                        '''
                         
                         // Check if test-diagnostic.sh exists before running
                         sh '''
@@ -138,10 +148,20 @@ pipeline {
             steps {
                 dir('frontend') {
                     script {
-                        // Clean npm cache and node_modules
+                        // Clean npm cache and node_modules but keep package-lock.json for ci
                         sh 'npm cache clean --force'
-                        sh 'rm -rf node_modules package-lock.json'
-                        sh 'npm ci'
+                        sh 'rm -rf node_modules'
+                        
+                        // Use npm ci if package-lock.json exists, otherwise npm install
+                        sh '''
+                            if [ -f package-lock.json ]; then
+                                echo "Using npm ci with existing package-lock.json"
+                                npm ci
+                            else
+                                echo "No package-lock.json found, using npm install"
+                                npm install
+                            fi
+                        '''
                         
                         // Check if test-diagnostic.sh exists before running
                         sh '''
