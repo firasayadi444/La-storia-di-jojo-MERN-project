@@ -384,7 +384,7 @@ networks:
                     // Stop existing containers if running
                     sh '''
                         echo "🛑 Stopping existing containers..."
-                        docker-compose -f docker-compose.deploy.yml down --remove-orphans || echo "No containers to stop"
+                        docker compose -f docker-compose.deploy.yml down --remove-orphans || echo "No containers to stop"
                     '''
 
                     // Pull latest images
@@ -398,7 +398,7 @@ networks:
                     // Deploy with docker-compose
                     sh '''
                         echo "🚀 Deploying application with MongoDB..."
-                        docker-compose -f docker-compose.deploy.yml up -d
+                        docker compose -f docker-compose.deploy.yml up -d
                     '''
 
                     // Wait for services to be ready
@@ -415,7 +415,7 @@ networks:
                     // Check deployment status
                     sh '''
                         echo "✅ Checking deployment status..."
-                        docker-compose -f docker-compose.deploy.yml ps
+                        docker compose -f docker-compose.deploy.yml ps
                         echo "📊 Container logs:"
                         echo "=== MongoDB logs ==="
                         docker logs orderapp-mongo --tail 10 || echo "MongoDB logs not available"
@@ -457,7 +457,7 @@ networks:
                         // Show logs for debugging
                         sh '''
                             echo "📋 Deployment failure logs:"
-                            docker-compose -f docker-compose.deploy.yml logs --tail 50 || echo "No logs available"
+                            docker compose -f docker-compose.deploy.yml logs --tail 50 || echo "No logs available"
                             echo "🔍 Container status:"
                             docker ps -a | grep orderapp || echo "No orderapp containers found"
                         '''
