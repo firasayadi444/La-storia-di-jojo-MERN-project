@@ -3,6 +3,7 @@ pipeline {
 
     tools {
         nodejs 'NodeJS 22' // Utilise la configuration Node.js de Jenkins
+        sonarScanner 'SonarScanner'
     }
 
     environment {
@@ -44,22 +45,19 @@ pipeline {
         }
         
         stage('SonarQube Analysis') {
-            steps {
-                script {
-                    withSonarQubeEnv('SonarQube') {
-                        // Adapt paths and keys to your project config
-                        sh """
-                            sonar-scanner \
-                            -Dsonar.projectKey=OrderApp-backend \
-                            -Dsonar.sources=backend \
-                            -Dsonar.tests=backend/tests \
-                            -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info \
-                            -Dsonar.login=${SONAR_TOKEN}
-                        """
-                    }
-                }
-            }
+    steps {
+        withSonarQubeEnv('SonarQube') {
+            sh '''
+                sonar-scanner \
+                -Dsonar.projectKey=OrderApp-backend \
+                -Dsonar.sources=backend \
+                -Dsonar.tests=backend/tests \
+                -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info \
+                -Dsonar.login=$SONAR_TOKEN
+            '''
         }
+    }
+}
 
         stage('Environment Check') {
             steps {
