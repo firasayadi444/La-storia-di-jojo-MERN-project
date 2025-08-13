@@ -42,6 +42,7 @@ pipeline {
                 }
             }
         }
+        
         stage('SonarQube Analysis') {
             steps {
                 script {
@@ -224,8 +225,6 @@ pipeline {
             }
         }
 
-       
-
         stage('Dependency Audit') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
@@ -261,8 +260,6 @@ pipeline {
             }
         }
 
-
-
         stage('Push Backend Image') {
             steps {
                 script {
@@ -286,6 +283,5 @@ pipeline {
                 }
             }
         }
-
-      
+    }
 }
