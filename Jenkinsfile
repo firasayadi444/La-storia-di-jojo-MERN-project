@@ -246,6 +246,19 @@ pipeline {
                 }
             }
         }
+         stage('Scan Backend Image with Trivy') {
+            steps {
+                script {
+                    def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                    // Run trivy scan and fail build if HIGH or CRITICAL vulnerabilities found
+                    sh """
+                        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ${BACKEND_IMAGE}:${imageTag} || \
+                        (echo "Trivy scan found vulnerabilities!" && exit 1)
+                    """
+                }
+            }
+        }
+
 
         stage('Build Frontend Image') {
             steps {
@@ -254,6 +267,17 @@ pipeline {
                         def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
                         sh "docker build -t ${FRONTEND_IMAGE}:${imageTag} -t ${FRONTEND_IMAGE}:latest ."
                     }
+                }
+            }
+        }
+        stage('Scan Frontend Image with Trivy') {
+            steps {
+                script {
+                    def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                    sh """
+                        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ${FRONTEND_IMAGE}:${imageTag} || \
+                        (echo "Trivy scan found vulnerabilities!" && exit 1)
+                    """
                 }
             }
         }
@@ -281,5 +305,27 @@ pipeline {
                 }
             }
         }
+        stage('Cleanup Docker Images') {
+    steps {
+        script {
+            def backendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+            def frontendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+            // Remove backend images
+            sh """
+                docker rmi ${BACKEND_IMAGE}:${backendTag} || echo "Backend image ${backendTag} not found"
+                docker rmi ${BACKEND_IMAGE}:latest || echo "Backend latest image not found"
+            """
+            // Remove frontend images
+            sh """
+                docker rmi ${FRONTEND_IMAGE}:${frontendTag} || echo "Frontend image ${frontendTag} not found"
+                docker rmi ${FRONTEND_IMAGE}:latest || echo "Frontend latest image not found"
+            """
+            // Optional: clean up dangling images
+            sh 'docker image prune -f'
+        }
+    }
+}
+
+        
     }
 }
