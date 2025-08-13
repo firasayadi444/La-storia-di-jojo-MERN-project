@@ -50,6 +50,7 @@ pipeline {
                 sonar-scanner \
                 -Dsonar.projectKey=OrderApp-backend \
                 -Dsonar.sources=backend \
+                -Dsonar.exclusions=backend/tests/** \
                 -Dsonar.tests=backend/tests \
                 -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info \
                 -Dsonar.login=$SONAR_TOKEN
