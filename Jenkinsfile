@@ -3,7 +3,7 @@ pipeline {
 
     tools {
         nodejs 'NodeJS 22' // Utilise la configuration Node.js de Jenkins
-        sonarScanner 'SonarScanner'
+        sonarQubeScanner 'SonarQubeScanner'
     }
 
     environment {
