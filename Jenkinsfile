@@ -3,7 +3,6 @@ pipeline {
 
      tools {
         nodejs 'NodeJS 22'
-        SonarRunner 'SonarQubeScanner'   // nom exact de l'installation
     }
 
     environment {
