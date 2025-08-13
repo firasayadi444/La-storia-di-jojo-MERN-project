@@ -1,9 +1,9 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'NodeJS 22' // Utilise la configuration Node.js de Jenkins
-        SonarRunner 'SonarQubeScanner'
+     tools {
+        nodejs 'NodeJS 22'
+        SonarRunner 'SonarQubeScanner'   // nom exact de l'installation
     }
 
     environment {
