@@ -329,26 +329,26 @@ stage('Deploy to Kubernetes') {
     steps {
         // Utiliser le secret text pour créer un kubeconfig temporaire
         withCredentials([string(credentialsId: 'kubeconfig-secret', variable: 'KUBECONFIG_TEXT')]) {
-            sh '''
-                # Créer un fichier kubeconfig temporaire
-                echo "$KUBECONFIG_TEXT" > kubeconfig-temp
-                export KUBECONFIG=$(pwd)/kubeconfig-temp
+    sh '''
+        # Créer un kubeconfig temporaire correctement
+        printf "%s" "$KUBECONFIG_TEXT" > kubeconfig-temp
+        export KUBECONFIG=$(pwd)/kubeconfig-temp
 
-                # Appliquer les manifests
-                kubectl apply -f k8s-manifestes/ -n orderapp-k8s --validate=false
+        # Appliquer les manifests
+        kubectl apply -f k8s-manifestes/ -n orderapp-k8s --validate=false
 
-                # Forcer le redeploiement si images :latest
-                kubectl rollout restart deployment/backend-deployment -n orderapp-k8s
-                kubectl rollout restart deployment/frontend-deployment -n orderapp-k8s
+        # Forcer le redeploiement
+        kubectl rollout restart deployment/backend-deployment -n orderapp-k8s
+        kubectl rollout restart deployment/frontend-deployment -n orderapp-k8s
 
-                # Vérifier le statut du rollout
-                kubectl rollout status deployment/backend-deployment -n orderapp-k8s
-                kubectl rollout status deployment/frontend-deployment -n orderapp-k8s
+        # Vérifier le rollout
+        kubectl rollout status deployment/backend-deployment -n orderapp-k8s
+        kubectl rollout status deployment/frontend-deployment -n orderapp-k8s
 
-                # Supprimer le fichier temporaire
-                rm -f kubeconfig-temp
-            '''
-        }
+        # Supprimer le fichier temporaire
+        rm -f kubeconfig-temp
+    '''
+}
     }
 }
 
