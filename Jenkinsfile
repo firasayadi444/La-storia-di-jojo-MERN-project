@@ -71,29 +71,30 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes') {
-    steps {
-        script {
-            // Compose the image tag from Jenkins BUILD_NUMBER + short Git commit
-            def imageTag = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
+            steps {
+                script {
+                    // Compose the image tag from Jenkins BUILD_NUMBER + short Git commit
+                    def imageTag = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
 
-            withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
-                // Apply manifests (create or update)
-                sh """
-                    kubectl apply -f k8s-manifestes/backend-deployment.yaml
-                    kubectl apply -f k8s-manifestes/frontend-deployment.yaml
+                    withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
+                        // Apply manifests (create or update)
+                        sh """
+                            kubectl apply -f k8s-manifestes/backend-deployment.yaml
+                            kubectl apply -f k8s-manifestes/frontend-deployment.yaml
 
-                    # Update the container images inside the deployments
-                    kubectl set image deployment/nodejs-backend nodejs-backend=${BACKEND_IMAGE}:${imageTag} --record
-                    kubectl set image deployment/react-frontend react-frontend=${FRONTEND_IMAGE}:${imageTag} --record
+                            # Update the container images inside the deployments
+                            kubectl set image deployment/nodejs-backend nodejs-backend=${BACKEND_IMAGE}:${imageTag} --record
+                            kubectl set image deployment/react-frontend react-frontend=${FRONTEND_IMAGE}:${imageTag} --record
 
-                    # Wait for rollout to finish
-                    kubectl rollout status deployment/nodejs-backend
-                    kubectl rollout status deployment/react-frontend
-                """
+                            # Wait for rollout to finish
+                            kubectl rollout status deployment/nodejs-backend
+                            kubectl rollout status deployment/react-frontend
+                        """
+                    }
+                }
             }
         }
     }
-}
 
     post {
         always {
@@ -110,4 +111,4 @@ pipeline {
             echo '❌ Échec du déploiement.'
         }
     }
-}
+} 
