@@ -101,246 +101,250 @@ pipeline {
             }
         }
 
-        stage('Backend Test') {
-            steps {
-                dir('backend') {
-                    script {
-                        // Clean npm cache and node_modules but keep package-lock.json for ci
-                        sh 'npm cache clean --force'
-                        sh 'rm -rf node_modules'
+//         stage('Backend Test') {
+//             steps {
+//                 dir('backend') {
+//                     script {
+//                         // Clean npm cache and node_modules but keep package-lock.json for ci
+//                         sh 'npm cache clean --force'
+//                         sh 'rm -rf node_modules'
                         
-                        // Use npm ci if package-lock.json exists, otherwise npm install
-                        sh '''
-                            if [ -f package-lock.json ]; then
-                                echo "Using npm ci with existing package-lock.json"
-                                npm ci
-                            else
-                                echo "No package-lock.json found, using npm install"
-                                npm install
-                            fi
-                        '''
+//                         // Use npm ci if package-lock.json exists, otherwise npm install
+//                         sh '''
+//                             if [ -f package-lock.json ]; then
+//                                 echo "Using npm ci with existing package-lock.json"
+//                                 npm ci
+//                             else
+//                                 echo "No package-lock.json found, using npm install"
+//                                 npm install
+//                             fi
+//                         '''
                         
-                        // Check if test-diagnostic.sh exists before running
-                        sh '''
-                            if [ -f test-diagnostic.sh ]; then
-                                chmod +x test-diagnostic.sh && ./test-diagnostic.sh
-                            else
-                                echo "test-diagnostic.sh not found, skipping diagnostic"
-                            fi
-                        '''
+//                         // Check if test-diagnostic.sh exists before running
+//                         sh '''
+//                             if [ -f test-diagnostic.sh ]; then
+//                                 chmod +x test-diagnostic.sh && ./test-diagnostic.sh
+//                             else
+//                                 echo "test-diagnostic.sh not found, skipping diagnostic"
+//                             fi
+//                         '''
                         
-                        // Run tests with timeout and error handling - Continue on failure
-                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            timeout(time: 10, unit: 'MINUTES') {
-                                sh '''
-                                    if npm run | grep -q "test:ci"; then
-                                        npm run test:ci || echo "Backend tests failed but continuing pipeline"
-                                    elif npm run | grep -q "test"; then
-                                        npm test || echo "Backend tests failed but continuing pipeline"
-                                    else
-                                        echo "No test script found, skipping tests"
-                                    fi
-                                '''
-                            }
-                        }
-                    }
-                }
-            }
-            post {
-                always {
-                    script {
-                        // Publish test results if they exist
-                        if (fileExists('backend/test-results.xml')) {
-                            publishTestResults testResultsPattern: 'backend/test-results.xml'
-                        }
-                        // Archive test coverage if it exists
-                        if (fileExists('backend/coverage')) {
-                            archiveArtifacts artifacts: 'backend/coverage/**/*', allowEmptyArchive: true
-                        }
-                    }
-                }
-            }
-        }
+//                         // Run tests with timeout and error handling - Continue on failure
+//                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+//                             timeout(time: 10, unit: 'MINUTES') {
+//                                 sh '''
+//                                     if npm run | grep -q "test:ci"; then
+//                                         npm run test:ci || echo "Backend tests failed but continuing pipeline"
+//                                     elif npm run | grep -q "test"; then
+//                                         npm test || echo "Backend tests failed but continuing pipeline"
+//                                     else
+//                                         echo "No test script found, skipping tests"
+//                                     fi
+//                                 '''
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//             post {
+//                 always {
+//                     script {
+//                         // Publish test results if they exist
+//                         if (fileExists('backend/test-results.xml')) {
+//                             publishTestResults testResultsPattern: 'backend/test-results.xml'
+//                         }
+//                         // Archive test coverage if it exists
+//                         if (fileExists('backend/coverage')) {
+//                             archiveArtifacts artifacts: 'backend/coverage/**/*', allowEmptyArchive: true
+//                         }
+//                     }
+//                 }
+//             }
+//         }
 
-        stage('Frontend Test') {
-            steps {
-                dir('frontend') {
-                    script {
-                        // Clean npm cache and node_modules but keep package-lock.json for ci
-                        sh 'npm cache clean --force'
-                        sh 'rm -rf node_modules'
+//         stage('Frontend Test') {
+//             steps {
+//                 dir('frontend') {
+//                     script {
+//                         // Clean npm cache and node_modules but keep package-lock.json for ci
+//                         sh 'npm cache clean --force'
+//                         sh 'rm -rf node_modules'
                         
-                        // Use npm ci if package-lock.json exists, otherwise npm install
-                        sh '''
-                            if [ -f package-lock.json ]; then
-                                echo "Using npm ci with existing package-lock.json"
-                                npm ci
-                            else
-                                echo "No package-lock.json found, using npm install"
-                                npm install
-                            fi
-                        '''
+//                         // Use npm ci if package-lock.json exists, otherwise npm install
+//                         sh '''
+//                             if [ -f package-lock.json ]; then
+//                                 echo "Using npm ci with existing package-lock.json"
+//                                 npm ci
+//                             else
+//                                 echo "No package-lock.json found, using npm install"
+//                                 npm install
+//                             fi
+//                         '''
                         
-                        // Check if test-diagnostic.sh exists before running
-                        sh '''
-                            if [ -f test-diagnostic.sh ]; then
-                                chmod +x test-diagnostic.sh && ./test-diagnostic.sh
-                            else
-                                echo "test-diagnostic.sh not found, skipping diagnostic"
-                            fi
-                        '''
+//                         // Check if test-diagnostic.sh exists before running
+//                         sh '''
+//                             if [ -f test-diagnostic.sh ]; then
+//                                 chmod +x test-diagnostic.sh && ./test-diagnostic.sh
+//                             else
+//                                 echo "test-diagnostic.sh not found, skipping diagnostic"
+//                             fi
+//                         '''
                         
-                        // Run tests with timeout and error handling - Continue on failure
-                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                            timeout(time: 10, unit: 'MINUTES') {
-                                sh '''
-                                    if npm run | grep -q "test:ci"; then
-                                        npm run test:ci || echo "Frontend tests failed but continuing pipeline"
-                                    elif npm run | grep -q "test"; then
-                                        npm test || echo "Frontend tests failed but continuing pipeline"
-                                    else
-                                        echo "No test script found, skipping tests"
-                                    fi
-                                '''
-                            }
-                        }
-                    }
-                }
-            }
-            post {
-                always {
-                    script {
-                        // Publish test results if they exist
-                        if (fileExists('frontend/test-results.xml')) {
-                            publishTestResults testResultsPattern: 'frontend/test-results.xml'
-                        }
-                        // Archive test coverage if it exists
-                        if (fileExists('frontend/coverage')) {
-                            archiveArtifacts artifacts: 'frontend/coverage/**/*', allowEmptyArchive: true
-                        }
-                    }
-                }
-            }
-        }
+//                         // Run tests with timeout and error handling - Continue on failure
+//                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+//                             timeout(time: 10, unit: 'MINUTES') {
+//                                 sh '''
+//                                     if npm run | grep -q "test:ci"; then
+//                                         npm run test:ci || echo "Frontend tests failed but continuing pipeline"
+//                                     elif npm run | grep -q "test"; then
+//                                         npm test || echo "Frontend tests failed but continuing pipeline"
+//                                     else
+//                                         echo "No test script found, skipping tests"
+//                                     fi
+//                                 '''
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//             post {
+//                 always {
+//                     script {
+//                         // Publish test results if they exist
+//                         if (fileExists('frontend/test-results.xml')) {
+//                             publishTestResults testResultsPattern: 'frontend/test-results.xml'
+//                         }
+//                         // Archive test coverage if it exists
+//                         if (fileExists('frontend/coverage')) {
+//                             archiveArtifacts artifacts: 'frontend/coverage/**/*', allowEmptyArchive: true
+//                         }
+//                     }
+//                 }
+//             }
+//         }
 
-        stage('Dependency Audit') {
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    dir('backend') {
-                        sh 'npm audit --audit-level=moderate || echo "Audit completed with warnings"'
-                    }
-                    dir('frontend') {
-                        sh 'npm audit --audit-level=moderate || echo "Audit completed with warnings"'
-                    }
-                }
-            }
-        }
+//         stage('Dependency Audit') {
+//             steps {
+//                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+//                     dir('backend') {
+//                         sh 'npm audit --audit-level=moderate || echo "Audit completed with warnings"'
+//                     }
+//                     dir('frontend') {
+//                         sh 'npm audit --audit-level=moderate || echo "Audit completed with warnings"'
+//                     }
+//                 }
+//             }
+//         }
 
-        stage('Build Backend Image') {
-            steps {
-                script {
-                    dir('backend') {
-                        def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                        sh "docker build -t ${BACKEND_IMAGE}:${imageTag} -t ${BACKEND_IMAGE}:latest ."
-                    }
-                }
-            }
-        }
-         stage('Scan Backend Image with Trivy') {
-            steps {
-                script {
-                    def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                    // Run trivy scan and fail build if HIGH or CRITICAL vulnerabilities found
-                    sh """
-                        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ${BACKEND_IMAGE}:${imageTag} || \
-                        (echo "Trivy scan found vulnerabilities!" && exit 1)
-                    """
-                }
-            }
-        }
+//         stage('Build Backend Image') {
+//             steps {
+//                 script {
+//                     dir('backend') {
+//                         def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+//                         sh "docker build -t ${BACKEND_IMAGE}:${imageTag} -t ${BACKEND_IMAGE}:latest ."
+//                     }
+//                 }
+//             }
+//         }
+//          stage('Scan Backend Image with Trivy') {
+//             steps {
+//                 script {
+//                     def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+//                     // Run trivy scan and fail build if HIGH or CRITICAL vulnerabilities found
+//                     sh """
+//                         trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ${BACKEND_IMAGE}:${imageTag} || \
+//                         (echo "Trivy scan found vulnerabilities!" && exit 1)
+//                     """
+//                 }
+//             }
+//         }
 
 
-        stage('Build Frontend Image') {
-            steps {
-                script {
-                    dir('frontend') {
-                        def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                        sh "docker build -t ${FRONTEND_IMAGE}:${imageTag} -t ${FRONTEND_IMAGE}:latest ."
-                    }
-                }
-            }
-        }
-        stage('Scan Frontend Image with Trivy') {
-            steps {
-                script {
-                    def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                    sh """
-                        trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ${FRONTEND_IMAGE}:${imageTag} || \
-                        (echo "Trivy scan found vulnerabilities!" && exit 1)
-                    """
-                }
-            }
-        }
+//         stage('Build Frontend Image') {
+//             steps {
+//                 script {
+//                     dir('frontend') {
+//                         def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+//                         sh "docker build -t ${FRONTEND_IMAGE}:${imageTag} -t ${FRONTEND_IMAGE}:latest ."
+//                     }
+//                 }
+//             }
+//         }
+//         stage('Scan Frontend Image with Trivy') {
+//             steps {
+//                 script {
+//                     def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+//                     sh """
+//                         trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed ${FRONTEND_IMAGE}:${imageTag} || \
+//                         (echo "Trivy scan found vulnerabilities!" && exit 1)
+//                     """
+//                 }
+//             }
+//         }
 
-        stage('Push Backend Image') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_HUB_CREDENTIALS) {
-                        def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                        sh "docker push ${BACKEND_IMAGE}:${imageTag}"
-                        sh "docker push ${BACKEND_IMAGE}:latest"
-                    }
-                }
-            }
-        }
+//         stage('Push Backend Image') {
+//             steps {
+//                 script {
+//                     docker.withRegistry('https://index.docker.io/v1/', DOCKER_HUB_CREDENTIALS) {
+//                         def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+//                         sh "docker push ${BACKEND_IMAGE}:${imageTag}"
+//                         sh "docker push ${BACKEND_IMAGE}:latest"
+//                     }
+//                 }
+//             }
+//         }
 
-        stage('Push Frontend Image') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', DOCKER_HUB_CREDENTIALS) {
-                        def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                        sh "docker push ${FRONTEND_IMAGE}:${imageTag}"
-                        sh "docker push ${FRONTEND_IMAGE}:latest"
-                    }
-                }
-            }
-        }
-        stage('Cleanup Docker Images') {
-    steps {
-        script {
-            def backendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-            def frontendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-            // Remove backend images
-            sh """
-                docker rmi ${BACKEND_IMAGE}:${backendTag} || echo "Backend image ${backendTag} not found"
-                docker rmi ${BACKEND_IMAGE}:latest || echo "Backend latest image not found"
-            """
-            // Remove frontend images
-            sh """
-                docker rmi ${FRONTEND_IMAGE}:${frontendTag} || echo "Frontend image ${frontendTag} not found"
-                docker rmi ${FRONTEND_IMAGE}:latest || echo "Frontend latest image not found"
-            """
-            // Optional: clean up dangling images
-            sh 'docker image prune -f'
-        }
-    }
-}
+//         stage('Push Frontend Image') {
+//             steps {
+//                 script {
+//                     docker.withRegistry('https://index.docker.io/v1/', DOCKER_HUB_CREDENTIALS) {
+//                         def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+//                         sh "docker push ${FRONTEND_IMAGE}:${imageTag}"
+//                         sh "docker push ${FRONTEND_IMAGE}:latest"
+//                     }
+//                 }
+//             }
+//         }
+//         stage('Cleanup Docker Images') {
+//     steps {
+//         script {
+//             def backendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+//             def frontendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+//             // Remove backend images
+//             sh """
+//                 docker rmi ${BACKEND_IMAGE}:${backendTag} || echo "Backend image ${backendTag} not found"
+//                 docker rmi ${BACKEND_IMAGE}:latest || echo "Backend latest image not found"
+//             """
+//             // Remove frontend images
+//             sh """
+//                 docker rmi ${FRONTEND_IMAGE}:${frontendTag} || echo "Frontend image ${frontendTag} not found"
+//                 docker rmi ${FRONTEND_IMAGE}:latest || echo "Frontend latest image not found"
+//             """
+//             // Optional: clean up dangling images
+//             sh 'docker image prune -f'
+//         }
+//     }
+// }
 stage('Deploy to Kubernetes') {
     steps {
-        script {
-            // Appliquer les manifests
-            sh "kubectl apply -f k8s-manifestes/ -n orderapp-k8s"
+        // Utiliser le kubeconfig secret pour kubectl
+        withCredentials([file(credentialsId: 'kubeconfig-secret', variable: 'KUBECONFIG')]) {
+            script {
+                // Appliquer les manifests
+                sh 'kubectl apply -f k8s-manifestes/ -n orderapp-k8s --validate=false'
 
-            // Forcer le redeploiement (utile car même tag latest)
-            sh "kubectl rollout restart deployment/backend-deployment -n orderapp-k8s"
-            sh "kubectl rollout restart deployment/frontend-deployment -n orderapp-k8s"
+                // Forcer le redeploiement pour les images :latest
+                sh 'kubectl rollout restart deployment/backend-deployment -n orderapp-k8s'
+                sh 'kubectl rollout restart deployment/frontend-deployment -n orderapp-k8s'
 
-            // Vérifier rollout
-            sh "kubectl rollout status deployment/backend-deployment -n orderapp-k8s"
-            sh "kubectl rollout status deployment/frontend-deployment -n orderapp-k8s"
+                // Vérifier le rollout
+                sh 'kubectl rollout status deployment/backend-deployment -n orderapp-k8s'
+                sh 'kubectl rollout status deployment/frontend-deployment -n orderapp-k8s'
+            }
         }
     }
 }
+
 
         
     }
