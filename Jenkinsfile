@@ -325,6 +325,22 @@ pipeline {
         }
     }
 }
+stage('Deploy to Kubernetes') {
+    steps {
+        script {
+            // Appliquer les manifests
+            sh "kubectl apply -f k8s-manifestes/ -n orderapp-k8s"
+
+            // Forcer le redeploiement (utile car même tag latest)
+            sh "kubectl rollout restart deployment/backend-deployment -n orderapp-k8s"
+            sh "kubectl rollout restart deployment/frontend-deployment -n orderapp-k8s"
+
+            // Vérifier rollout
+            sh "kubectl rollout status deployment/backend-deployment -n orderapp-k8s"
+            sh "kubectl rollout status deployment/frontend-deployment -n orderapp-k8s"
+        }
+    }
+}
 
         
     }
