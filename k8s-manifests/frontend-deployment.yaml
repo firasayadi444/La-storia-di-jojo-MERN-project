@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: react-frontend
+  labels:
+    app: react-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: react-frontend
+  template:
+    metadata:
+      labels:
+        app: react-frontend
+    spec:
+      containers:
+      - name: react-frontend
+        image: firas444/pfe-frontend:latest
+        ports:
+        - containerPort: 80
+        # If using nginx to serve React build
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config

@@ -1,24 +1,19 @@
-# 📦 Base image
-FROM node:22-alpine
-
-# 📁 Dossier de travail dans le conteneur
+# Étape 1 : Build React avec Node
+FROM node:22-alpine AS builder
 WORKDIR /app
 
-# 📄 Copie des fichiers package.json et package-lock.json
 COPY package*.json ./
+RUN npm ci --prefer-offline
 
-# 📥 Installation des dépendances avec cache optimisé
-RUN npm ci --cache .npm --prefer-offline
-
-# 🗂️ Copie de tout le code source
 COPY . .
+RUN npm run build
 
-# 🌱 Variables d'environnement
-ENV NODE_ENV=development
-ENV VITE_API_URL=http://localhost:5000/api
+# Étape 2 : Servir le build avec Nginx
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# 🔥 Exposition du port 3000
-EXPOSE 3000
+# Copier le config Nginx si tu veux le proxy vers /api
+COPY nginx-config/default.conf /etc/nginx/conf.d/default.conf
 
-# 🏁 Commande de démarrage avec Vite
-CMD ["npm", "run", "dev"] 
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
