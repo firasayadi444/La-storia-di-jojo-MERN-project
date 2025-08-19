@@ -1,5 +1,5 @@
 pipeline {
-    agent any   // ✅ Run on Jenkins VM, not inside Kubernetes
+    agent any   // Run on Jenkins VM
 
     tools {
         nodejs 'NodeJS 22'
@@ -11,8 +11,7 @@ pipeline {
         BACKEND_IMAGE = "${DOCKER_HUB_REPO}-backend"
         FRONTEND_IMAGE = "${DOCKER_HUB_REPO}-frontend"
         SONAR_TOKEN = credentials('sonar-token')
-        KUBECONFIG = credentials('jenkins-sa')  
-        // 👆 You stored the kubeconfig or token as Jenkins credentials (secret file/string)
+        KUBECONFIG_CONTENT = credentials('jenkins-sa')  // Your kubeconfig or token as secret file/string
     }
 
     stages {
@@ -75,32 +74,33 @@ pipeline {
             }
         }
 
-      stage('Deploy to Kubernetes') {
-    steps {
-        script {
-            def imageTag = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    def imageTag = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
 
-            // Write the token to a temp kubeconfig file
-            writeFile file: 'kubeconfig.yml', text: KUBECONFIG
+                    // Write kubeconfig to temp file
+                    writeFile file: 'kubeconfig.yml', text: KUBECONFIG_CONTENT
 
-            withEnv(["KUBECONFIG=${pwd()}/kubeconfig.yml"]) {
-                sh """
-                    kubectl apply -f k8s-manifestes/backend-deployment.yaml
-                    kubectl apply -f k8s-manifestes/frontend-deployment.yaml
-                    kubectl set image deployment/backend backend=${BACKEND_IMAGE}:${imageTag}
-                    kubectl set image deployment/frontend frontend=${FRONTEND_IMAGE}:${imageTag}
-                    kubectl rollout status deployment/backend
-                    kubectl rollout status deployment/frontend
-                """
+                    withEnv(["KUBECONFIG=${pwd()}/kubeconfig.yml"]) {
+                        sh """
+                            kubectl apply -f k8s-manifestes/backend-deployment.yaml
+                            kubectl apply -f k8s-manifestes/frontend-deployment.yaml
+                            kubectl set image deployment/backend backend=${BACKEND_IMAGE}:${imageTag}
+                            kubectl set image deployment/frontend frontend=${FRONTEND_IMAGE}:${imageTag}
+                            kubectl rollout status deployment/backend
+                            kubectl rollout status deployment/frontend
+                        """
+                    }
+                }
             }
         }
-    }
-}
+    } // <-- closes stages
 
     post {
         always {
             script {
-                withEnv(["KUBECONFIG=${KUBECONFIG}"]) {
+                withEnv(["KUBECONFIG=${pwd()}/kubeconfig.yml"]) {
                     sh 'kubectl get pods -n default'
                 }
             }
