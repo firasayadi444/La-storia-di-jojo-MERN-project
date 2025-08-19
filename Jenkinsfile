@@ -327,23 +327,31 @@ pipeline {
 // }
 stage('Deploy to Kubernetes') {
     steps {
-        // Utiliser le kubeconfig secret pour kubectl
-        withCredentials([file(credentialsId: 'kubeconfig-secret', variable: 'KUBECONFIG')]) {
-            script {
-                // Appliquer les manifests
-                sh 'kubectl apply -f k8s-manifestes/ -n orderapp-k8s --validate=false'
+        // Utiliser le secret text pour créer un kubeconfig temporaire
+        withCredentials([string(credentialsId: 'kubeconfig-secret', variable: 'KUBECONFIG_TEXT')]) {
+            sh '''
+                # Créer un fichier kubeconfig temporaire
+                echo "$KUBECONFIG_TEXT" > kubeconfig-temp
+                export KUBECONFIG=$(pwd)/kubeconfig-temp
 
-                // Forcer le redeploiement pour les images :latest
-                sh 'kubectl rollout restart deployment/backend-deployment -n orderapp-k8s'
-                sh 'kubectl rollout restart deployment/frontend-deployment -n orderapp-k8s'
+                # Appliquer les manifests
+                kubectl apply -f k8s-manifestes/ -n orderapp-k8s --validate=false
 
-                // Vérifier le rollout
-                sh 'kubectl rollout status deployment/backend-deployment -n orderapp-k8s'
-                sh 'kubectl rollout status deployment/frontend-deployment -n orderapp-k8s'
-            }
+                # Forcer le redeploiement si images :latest
+                kubectl rollout restart deployment/backend-deployment -n orderapp-k8s
+                kubectl rollout restart deployment/frontend-deployment -n orderapp-k8s
+
+                # Vérifier le statut du rollout
+                kubectl rollout status deployment/backend-deployment -n orderapp-k8s
+                kubectl rollout status deployment/frontend-deployment -n orderapp-k8s
+
+                # Supprimer le fichier temporaire
+                rm -f kubeconfig-temp
+            '''
         }
     }
 }
+
 
 
         
