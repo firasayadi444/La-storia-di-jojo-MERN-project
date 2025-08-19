@@ -71,22 +71,29 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
-                        sh """
-                            kubectl apply -f k8s-manifestes/backend-deployment.yaml
-                            kubectl apply -f k8s-manifestes/frontend-deployment.yaml
-                            kubectl set image deployment/backend backend=${BACKEND_IMAGE}:${BUILD_NUMBER}-${GIT_COMMIT.take(7)}
-                            kubectl set image deployment/frontend frontend=${FRONTEND_IMAGE}:${BUILD_NUMBER}-${GIT_COMMIT.take(7)}
-                            kubectl rollout status deployment/backend
-                            kubectl rollout status deployment/frontend
-                        """
-                    }
-                }
+    steps {
+        script {
+            // Compose the image tag from Jenkins BUILD_NUMBER + short Git commit
+            def imageTag = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
+
+            withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
+                // Apply manifests (create or update)
+                sh """
+                    kubectl apply -f k8s-manifestes/backend-deployment.yaml
+                    kubectl apply -f k8s-manifestes/frontend-deployment.yaml
+
+                    # Update the container images inside the deployments
+                    kubectl set image deployment/nodejs-backend nodejs-backend=${BACKEND_IMAGE}:${imageTag} --record
+                    kubectl set image deployment/react-frontend react-frontend=${FRONTEND_IMAGE}:${imageTag} --record
+
+                    # Wait for rollout to finish
+                    kubectl rollout status deployment/nodejs-backend
+                    kubectl rollout status deployment/react-frontend
+                """
             }
         }
     }
+}
 
     post {
         always {
