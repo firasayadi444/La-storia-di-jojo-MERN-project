@@ -1,4 +1,3 @@
-```groovy
 pipeline {
     agent {
         kubernetes {
@@ -367,4 +366,3 @@ spec:
         }
     }
 }
-```
