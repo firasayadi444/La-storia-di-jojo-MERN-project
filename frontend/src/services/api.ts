@@ -54,6 +54,13 @@ export interface Order {
   foodRating?: number;
   feedbackComment?: string;
   assignedAt?: string;
+  payment?: {
+    paymentMethod: 'card' | 'cash';
+    status: 'pending' | 'paid' | 'failed' | 'refunded';
+    paidAt?: string;
+    paymentIntentId?: string;
+  };
+  cancelledAt?: string;
   createdAt: string;
   updatedAt: string;
 }

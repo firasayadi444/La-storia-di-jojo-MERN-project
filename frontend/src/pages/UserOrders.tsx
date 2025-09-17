@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X } from 'lucide-react';
+import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService, Order } from '../services/api';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useSocket } from '../contexts/SocketContext';
 
 const UserOrders: React.FC = () => {
   const { user } = useAuth();
@@ -25,14 +26,32 @@ const UserOrders: React.FC = () => {
   const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
   const [cancelConfirmDialog, setCancelConfirmDialog] = useState(false);
   const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { registerRefreshCallback, unregisterRefreshCallback } = useSocket();
 
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  const fetchOrders = async () => {
+  // Register WebSocket refresh callback
+  useEffect(() => {
+    const refreshKey = 'user-orders';
+    registerRefreshCallback(refreshKey, () => {
+      fetchOrders(true); // Show refresh indicator
+    });
+
+    return () => {
+      unregisterRefreshCallback(refreshKey);
+    };
+  }, [registerRefreshCallback, unregisterRefreshCallback]);
+
+  const fetchOrders = async (showRefreshIndicator = false) => {
     try {
-      setLoading(true);
+      if (showRefreshIndicator) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const response = await apiService.getUserOrders();
       const allOrders = response.orders || response.data || [];
       // Filter out delivered and cancelled orders - only show active orders
@@ -48,6 +67,7 @@ const UserOrders: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -170,9 +190,17 @@ const UserOrders: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-italian-green-800 mb-2">
-            My Active Orders
-          </h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold text-italian-green-800">
+              My Active Orders
+            </h1>
+            {isRefreshing && (
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Updating...</span>
+              </div>
+            )}
+          </div>
           <p className="text-italian-green-600">
             Track your current orders and provide feedback
           </p>

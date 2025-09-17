@@ -56,17 +56,21 @@ const orderController = {
       if (io) {
         const paymentInfo = paymentMethod === 'cash' ? ' (Cash on Delivery)' : ' (Card Payment)';
         
+        console.log('🔔 Emitting new-order event to admin room');
         io.to('admin').emit('new-order', {
           type: 'new-order',
           order,
           message: `New order #${order._id} received from ${order.user.name}${paymentInfo}`
         });
         
+        console.log('🔔 Emitting new-order event to delivery room');
         io.to('delivery').emit('new-order', {
           type: 'new-order',
           order,
           message: `New order #${order._id} available for delivery${paymentInfo}`
         });
+      } else {
+        console.log('❌ Socket.IO not available for new order notification');
       }
 
       res.status(201).json({
@@ -544,6 +548,7 @@ const orderController = {
         const io = socketService.getIO();
         if (io) {
           // Notify customer
+          console.log('🔔 Emitting order-updated event to customer:', order.user._id);
           io.to(`user-${order.user._id}`).emit('order-updated', {
             type: 'order-update',
             order,
@@ -551,6 +556,7 @@ const orderController = {
           });
 
           // Notify admin
+          console.log('🔔 Emitting order-updated event to admin room for cancellation');
           io.to('admin').emit('order-updated', {
             type: 'order-update',
             order,
@@ -559,13 +565,14 @@ const orderController = {
 
           // Notify delivery person if assigned
           if (order.deliveryMan) {
+            console.log('🔔 Emitting order-updated event to delivery person:', order.deliveryMan._id);
             io.to(`delivery-${order.deliveryMan._id}`).emit('order-updated', {
               type: 'order-update',
               order,
               message: `Order #${order._id.slice(-6)} has been cancelled`
             });
           }
-          console.log('WebSocket notifications sent successfully');
+          console.log('✅ WebSocket notifications sent successfully for order cancellation');
         }
       } catch (wsError) {
         console.error('WebSocket notification error (non-critical):', wsError);

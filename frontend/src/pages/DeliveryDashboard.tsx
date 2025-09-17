@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useSocket } from '../contexts/SocketContext';
 import { 
   MapPin, 
   Clock, 
@@ -27,7 +28,8 @@ import {
   Wifi,
   WifiOff,
   CreditCard,
-  Banknote
+  Banknote,
+  RefreshCw
 } from 'lucide-react';
 
 const DeliveryDashboard: React.FC = () => {
@@ -40,7 +42,9 @@ const DeliveryDashboard: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
+  const { registerRefreshCallback, unregisterRefreshCallback } = useSocket();
 
   // Fix: Only show orders assigned to this delivery man and with correct status
   const activeOrders = orders.filter(order =>
@@ -55,52 +59,71 @@ const DeliveryDashboard: React.FC = () => {
     order.status === 'pending' || order.status === 'ready' || order.status === 'out_for_delivery'
   );
 
+  const fetchData = async (showRefreshIndicator = false) => {
+    try {
+      if (showRefreshIndicator) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      const [activeOrdersResponse, notificationsResponse, historyResponse] = await Promise.all([
+        apiService.getDeliveryOrders(), // This gets active orders (ready, out_for_delivery)
+        apiService.getDeliveryNotifications(),
+        apiService.getDeliveryHistory() // This gets completed orders (delivered)
+      ]);
+      
+      // Set active orders from getDeliveryOrders
+      if (activeOrdersResponse.orders) {
+        setOrders(activeOrdersResponse.orders);
+      } else if (activeOrdersResponse.data) {
+        setOrders(activeOrdersResponse.data);
+      }
+      
+      // Set notifications
+      if (notificationsResponse.data) {
+        setNotifications(notificationsResponse.data);
+      }
+      
+      // Store completed orders separately if needed
+      const completedOrders = historyResponse.orders || historyResponse.data || [];
+      console.log('Completed orders:', completedOrders.length);
+      setCompletedOrders(completedOrders);
+      
+    } catch (error: any) {
+      console.error('Error fetching delivery data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load delivery data. Please try again later.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     if (user?.role !== 'delivery') return;
     
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [activeOrdersResponse, notificationsResponse, historyResponse] = await Promise.all([
-          apiService.getDeliveryOrders(), // This gets active orders (ready, out_for_delivery)
-          apiService.getDeliveryNotifications(),
-          apiService.getDeliveryHistory() // This gets completed orders (delivered)
-        ]);
-        
-        // Set active orders from getDeliveryOrders
-        if (activeOrdersResponse.orders) {
-          setOrders(activeOrdersResponse.orders);
-        } else if (activeOrdersResponse.data) {
-          setOrders(activeOrdersResponse.data);
-        }
-        
-        // Set notifications
-        if (notificationsResponse.data) {
-          setNotifications(notificationsResponse.data);
-        }
-        
-        // Store completed orders separately if needed
-        const completedOrders = historyResponse.orders || historyResponse.data || [];
-        console.log('Completed orders:', completedOrders.length);
-        setCompletedOrders(completedOrders);
-        
-      } catch (error: any) {
-        console.error('Error fetching delivery data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load delivery data. Please try again later.",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
     // Refresh every 30 seconds
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(interval);
   }, [user, toast]);
+
+  // Register WebSocket refresh callback
+  useEffect(() => {
+    if (user?.role !== 'delivery') return;
+    
+    const refreshKey = 'delivery-dashboard';
+    registerRefreshCallback(refreshKey, () => {
+      fetchData(true); // Show refresh indicator
+    });
+
+    return () => {
+      unregisterRefreshCallback(refreshKey);
+    };
+  }, [user, registerRefreshCallback, unregisterRefreshCallback]);
 
   const handleAvailabilityToggle = async (checked: boolean) => {
     await updateAvailability(checked);
@@ -211,7 +234,15 @@ const DeliveryDashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* --- SECTION 1: Active Orders & Assignments --- */}
         <div className="mb-12">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Delivery Management</h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold text-gray-900">Delivery Management</h1>
+            {isRefreshing && (
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Updating...</span>
+              </div>
+            )}
+          </div>
           <p className="text-gray-600 mb-6">Manage your active deliveries and assignments</p>
           
           {/* Availability Toggle Section */}

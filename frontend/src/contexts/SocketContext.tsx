@@ -9,6 +9,10 @@ interface SocketContextType {
   addNotification: (notification: Notification) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
+  // Data refresh callbacks
+  refreshCallbacks: Map<string, () => void>;
+  registerRefreshCallback: (key: string, callback: () => void) => void;
+  unregisterRefreshCallback: (key: string) => void;
 }
 
 interface Notification {
@@ -36,6 +40,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [refreshCallbacks] = useState<Map<string, () => void>>(new Map());
   const { user } = useAuth();
 
   useEffect(() => {
@@ -62,6 +67,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Listen for order updates
       newSocket.on('order-updated', (data) => {
+        console.log('🔄 Order updated received via WebSocket:', data);
         addNotification({
           id: `order-${data.order._id}-${Date.now()}`,
           type: 'order-update',
@@ -70,6 +76,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           order: data.order,
           timestamp: new Date(),
           read: false
+        });
+        
+        // Trigger data refresh for all registered callbacks
+        console.log('🔄 Triggering refresh callbacks for order update, count:', refreshCallbacks.size);
+        refreshCallbacks.forEach((callback, key) => {
+          try {
+            console.log(`🔄 Executing refresh callback for order update: ${key}`);
+            callback();
+          } catch (error) {
+            console.error('Error in refresh callback:', error);
+          }
         });
       });
 
@@ -88,6 +105,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Listen for new orders (admin and delivery)
       newSocket.on('new-order', (data) => {
+        console.log('🔔 New order received via WebSocket:', data);
         addNotification({
           id: `new-order-${data.order._id}-${Date.now()}`,
           type: 'new-order',
@@ -96,6 +114,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           order: data.order,
           timestamp: new Date(),
           read: false
+        });
+        
+        // Trigger data refresh for all registered callbacks
+        console.log('🔄 Triggering refresh callbacks, count:', refreshCallbacks.size);
+        refreshCallbacks.forEach((callback, key) => {
+          try {
+            console.log(`🔄 Executing refresh callback for: ${key}`);
+            callback();
+          } catch (error) {
+            console.error('Error in refresh callback:', error);
+          }
         });
       });
 
@@ -139,13 +168,24 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNotifications([]);
   };
 
+  const registerRefreshCallback = (key: string, callback: () => void) => {
+    refreshCallbacks.set(key, callback);
+  };
+
+  const unregisterRefreshCallback = (key: string) => {
+    refreshCallbacks.delete(key);
+  };
+
   const value: SocketContextType = {
     socket,
     isConnected,
     notifications,
     addNotification,
     removeNotification,
-    clearNotifications
+    clearNotifications,
+    refreshCallbacks,
+    registerRefreshCallback,
+    unregisterRefreshCallback
   };
 
   return (

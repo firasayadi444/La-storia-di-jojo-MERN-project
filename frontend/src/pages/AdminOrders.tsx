@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, User as UserIcon, Truck, Package, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Clock, User as UserIcon, Truck, Package, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { useSocket } from '../contexts/SocketContext';
 
 const statusOptions = [
   'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'
@@ -38,16 +39,29 @@ const AdminOrders: React.FC = () => {
     estimatedDeliveryTime: '',
     deliveryNotes: ''
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { registerRefreshCallback, unregisterRefreshCallback } = useSocket();
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (showRefreshIndicator = false) => {
+    console.log('📡 Admin dashboard fetchOrders called, showRefreshIndicator:', showRefreshIndicator);
+    if (showRefreshIndicator) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const res = await apiService.getAllOrders();
-      setOrders(res.orders || res.data || []);
+      console.log('📡 Admin dashboard fetchOrders response:', res);
+      const newOrders = res.orders || res.data || [];
+      console.log('📡 Admin dashboard orders count:', newOrders.length);
+      console.log('📡 Admin dashboard orders statuses:', newOrders.map(o => ({ id: o._id, status: o.status })));
+      setOrders(newOrders);
     } catch (e) {
+      console.error('📡 Admin dashboard fetchOrders error:', e);
       setOrders([]);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -60,10 +74,35 @@ const AdminOrders: React.FC = () => {
     }
   };
 
-  useEffect(() => { 
-    fetchOrders(); 
+  useEffect(() => {
+    fetchOrders();
     fetchDeliveryMen();
   }, []);
+
+  // Register WebSocket refresh callback
+  useEffect(() => {
+    const refreshKey = 'admin-orders';
+    console.log('📝 Admin dashboard registering refresh callback:', refreshKey);
+    registerRefreshCallback(refreshKey, () => {
+      console.log('🔄 Admin dashboard refresh callback triggered');
+      fetchOrders(true); // Show refresh indicator
+    });
+
+    return () => {
+      console.log('📝 Admin dashboard unregistering refresh callback:', refreshKey);
+      unregisterRefreshCallback(refreshKey);
+    };
+  }, [registerRefreshCallback, unregisterRefreshCallback]);
+
+  // Track orders changes for debugging
+  useEffect(() => {
+    console.log('📊 Admin dashboard orders updated:', {
+      total: orders.length,
+      active: orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length,
+      cancelled: orders.filter(o => o.status === 'cancelled').length,
+      delivered: orders.filter(o => o.status === 'delivered').length
+    });
+  }, [orders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -346,7 +385,15 @@ const AdminOrders: React.FC = () => {
 
         {/* Active Orders List */}
         <div className="mb-4">
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Active Orders</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xl font-semibold text-gray-800">Active Orders</h2>
+            {isRefreshing && (
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Updating...</span>
+              </div>
+            )}
+          </div>
           <p className="text-sm text-gray-600">Showing only pending, confirmed, preparing, ready, and out for delivery orders. Delivered and cancelled orders are shown in the history section.</p>
         </div>
 
