@@ -73,10 +73,17 @@ export function logoutUser(): void {
 /**
  * Automatically log out if token is expired or nearly expired.
  */
-export function validateAndRefreshToken(token: string): void {
-  const remaining = getTokenRemainingTime(token);
+export function validateAndRefreshToken(token?: string): boolean {
+  const tokenToCheck = token || localStorage.getItem('token') || sessionStorage.getItem('token');
+  if (!tokenToCheck) {
+    return false;
+  }
+  
+  const remaining = getTokenRemainingTime(tokenToCheck);
   if (remaining !== null && remaining < 60) {
     console.warn("Token is about to expire, logging out.");
     logoutUser();
+    return false;
   }
+  return true;
 }

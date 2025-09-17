@@ -338,6 +338,20 @@ class ApiService {
     return handleResponse<void>(response);
   }
 
+  async cancelOrder(id: string): Promise<ApiResponse<Order>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/orders/${id}/cancel`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    return handleResponse<Order>(response);
+  }
+
   async submitFeedback(orderId: string, feedback: {
     deliveryRating: number;
     foodRating: number;
@@ -535,6 +549,72 @@ class ApiService {
       },
     });
     return handleResponse<void>(response);
+  }
+
+  // Payment endpoints
+  async createPaymentIntent(orderId: string): Promise<ApiResponse<{ clientSecret: string; paymentIntentId: string }>> {
+    const token = localStorage.getItem('token');
+    console.log('📞 API: Creating payment intent for order:', orderId);
+    console.log('🔑 API: Token available:', !!token);
+    
+    const response = await fetch(`${this.baseURL}/payment/create-payment-intent/${orderId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    console.log('📞 API: Payment intent response status:', response.status);
+    const result = await handleResponse<{ clientSecret: string; paymentIntentId: string }>(response);
+    console.log('📞 API: Payment intent result:', result);
+    return result;
+  }
+
+  async confirmPayment(paymentIntentId: string): Promise<ApiResponse<{ order: Order }>> {
+    const token = localStorage.getItem('token');
+    console.log('✅ API: Confirming payment:', paymentIntentId);
+    console.log('🔑 API: Token available:', !!token);
+    
+    const response = await fetch(`${this.baseURL}/payment/confirm-payment`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ paymentIntentId }),
+    });
+    
+    console.log('✅ API: Confirm payment response status:', response.status);
+    const result = await handleResponse<{ order: Order }>(response);
+    console.log('✅ API: Confirm payment result:', result);
+    return result;
+  }
+
+  async getPaymentStatus(orderId: string): Promise<ApiResponse<{ payment: any; status: string; totalAmount: number }>> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${this.baseURL}/payment/status/${orderId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    return handleResponse<{ payment: any; status: string; totalAmount: number }>(response);
+  }
+
+
+  async refundPayment(orderId: string, reason?: string): Promise<ApiResponse<{ order: Order; refundId: string }>> {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${this.baseURL}/payment/refund/${orderId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reason }),
+    });
+    return handleResponse<{ order: Order; refundId: string }>(response);
   }
 }
 

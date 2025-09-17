@@ -12,7 +12,9 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^6.3.4",
     "multer": "^2.0.1",
-    "nodemailer": "^7.0.3"
+    "nodemailer": "^7.0.3",
+    "socket.io": "^4.8.1",
+    "stripe": "^18.5.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.8",

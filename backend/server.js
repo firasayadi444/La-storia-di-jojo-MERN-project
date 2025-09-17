@@ -2,8 +2,10 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { readdirSync } = require("fs");
+const http = require("http");
 const connectDatabase = require("./utils/database");
 const initDatabase = require("./init-db");
+const socketService = require("./services/socketService");
 const app = express();
 
 require("dotenv").config();
@@ -111,6 +113,7 @@ if (process.env.NODE_ENV !== 'test') {
   console.log('Mounting deliveryman routes...');
 }
 app.use("/api/deliveryman", require("./routes/deliverymanRoute"));
+app.use("/api/payment", require("./routes/paymentRoute"));
 
 if (process.env.NODE_ENV !== 'test') {
   console.log('All routes mounted successfully');
@@ -134,7 +137,12 @@ const port = process.env.PORT || 5000;
 
 // Only start server if not in test environment
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, () => {
+  const server = http.createServer(app);
+  
+  // Initialize WebSocket
+  socketService.initialize(server);
+  
+  server.listen(port, () => {
     console.log(`Server is running on port: ${port}`);
     console.log('Available routes:');
     console.log('- GET /test');

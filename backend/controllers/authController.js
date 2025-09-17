@@ -44,7 +44,7 @@ const authController = {
         return res.status(400).json({ message: "Invalid email or password" });
 
       const token = await jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
-        expiresIn: "7d",
+        expiresIn: "2h",
       });
 
       user.password = undefined;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye } from 'lucide-react';
+import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService, Order } from '../services/api';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,9 @@ const UserOrders: React.FC = () => {
     foodRating: 5,
     feedbackComment: ''
   });
+  const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
+  const [cancelConfirmDialog, setCancelConfirmDialog] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -31,7 +34,12 @@ const UserOrders: React.FC = () => {
     try {
       setLoading(true);
       const response = await apiService.getUserOrders();
-      setOrders(response.orders || response.data || []);
+      const allOrders = response.orders || response.data || [];
+      // Filter out delivered and cancelled orders - only show active orders
+      const activeOrders = allOrders.filter(order => 
+        order.status !== 'delivered' && order.status !== 'cancelled'
+      );
+      setOrders(activeOrders);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -79,6 +87,14 @@ const UserOrders: React.FC = () => {
     });
   };
 
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
   const handleSubmitFeedback = async () => {
     if (!selectedOrder) return;
 
@@ -99,6 +115,38 @@ const UserOrders: React.FC = () => {
         description: error.message || "Failed to submit feedback",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleCancelOrderClick = (order: Order) => {
+    setOrderToCancel(order);
+    setCancelConfirmDialog(true);
+  };
+
+  const handleCancelOrder = async () => {
+    if (!orderToCancel) return;
+
+    setCancellingOrder(orderToCancel._id);
+    setCancelConfirmDialog(false);
+    
+    try {
+      await apiService.cancelOrder(orderToCancel._id);
+      
+      toast({
+        title: "Order Cancelled",
+        description: "Your order has been cancelled successfully.",
+      });
+      
+      fetchOrders(); // Refresh orders
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel order",
+        variant: "destructive"
+      });
+    } finally {
+      setCancellingOrder(null);
+      setOrderToCancel(null);
     }
   };
 
@@ -123,20 +171,20 @@ const UserOrders: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-italian-green-800 mb-2">
-            My Orders
+            My Active Orders
           </h1>
           <p className="text-italian-green-600">
-            Track your orders and provide feedback
+            Track your current orders and provide feedback
           </p>
         </div>
 
         {/* Orders List */}
         {orders.length === 0 ? (
           <Card className="text-center p-8">
-            <div className="text-6xl mb-4">🍕</div>
-            <h2 className="text-2xl font-bold text-italian-green-800 mb-2">No Orders Yet</h2>
+            <div className="text-6xl mb-4">📦</div>
+            <h2 className="text-2xl font-bold text-italian-green-800 mb-2">No Active Orders</h2>
             <p className="text-italian-green-600 mb-6">
-              Start your culinary journey by placing your first order!
+              You don't have any active orders at the moment. Place a new order to get started!
             </p>
             <Button asChild className="btn-gradient text-white">
               <a href="/">Browse Menu</a>
@@ -156,10 +204,24 @@ const UserOrders: React.FC = () => {
                         Placed on {formatDate(order.createdAt)}
                       </p>
                     </div>
-                    <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
-                      {getStatusIcon(order.status)}
-                      {order.status.replace('_', ' ').toUpperCase()}
-                    </Badge>
+                    <div className="flex flex-col gap-2">
+                      <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
+                        {getStatusIcon(order.status)}
+                        {order.status.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className={`${
+                          order.payment?.status === 'paid' 
+                            ? 'text-green-600 border-green-600' 
+                            : order.payment?.status === 'failed'
+                            ? 'text-red-600 border-red-600'
+                            : 'text-yellow-600 border-yellow-600'
+                        }`}
+                      >
+                        {order.payment?.paymentMethod === 'cash' ? '💵 Cash' : '💳 Card'} - {order.payment?.status?.toUpperCase() || 'PENDING'}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 
@@ -266,6 +328,28 @@ const UserOrders: React.FC = () => {
 
                   {/* Action Buttons */}
                   <div className="flex justify-end space-x-2 pt-4 border-t border-italian-cream-200">
+                    {/* Cancel Button for Pending Orders */}
+                    {order.status === 'pending' && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleCancelOrderClick(order)}
+                        disabled={cancellingOrder === order._id}
+                      >
+                        {cancellingOrder === order._id ? (
+                          <>
+                            <Clock className="h-4 w-4 mr-2 animate-spin" />
+                            Cancelling...
+                          </>
+                        ) : (
+                          <>
+                            <X className="h-4 w-4 mr-2" />
+                            Cancel Order
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm">
@@ -286,7 +370,7 @@ const UserOrders: React.FC = () => {
                               </p>
                               {order.estimatedDeliveryTime && (
                                 <p className="text-sm">
-                                  <span className="text-italian-green-600">Estimated Delivery:</span> {formatDate(order.estimatedDeliveryTime)}
+                                  <span className="text-italian-green-600">Estimated Delivery:</span> {formatTime(order.estimatedDeliveryTime)}
                                 </p>
                               )}
                               {order.actualDeliveryTime && (
@@ -370,6 +454,54 @@ const UserOrders: React.FC = () => {
                   Submit Feedback
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cancel Order Confirmation Dialog */}
+        <Dialog open={cancelConfirmDialog} onOpenChange={setCancelConfirmDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <X className="h-5 w-5 text-red-500" />
+                Cancel Order
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Are you sure you want to cancel this order? This action cannot be undone.
+              </p>
+              {orderToCancel && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm font-medium">Order #{orderToCancel._id.slice(-6)}</p>
+                  <p className="text-sm text-gray-600">
+                    Total: ${orderToCancel.totalAmount.toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setCancelConfirmDialog(false)}
+                disabled={cancellingOrder !== null}
+              >
+                Keep Order
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleCancelOrder}
+                disabled={cancellingOrder !== null}
+              >
+                {cancellingOrder ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  'Yes, Cancel Order'
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

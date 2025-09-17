@@ -99,7 +99,7 @@ const AdminOrders: React.FC = () => {
   };
 
   const sortedOrders = [...orders]
-    .filter(order => order.status !== 'delivered')
+    .filter(order => order.status !== 'delivered' && order.status !== 'cancelled')
     .sort((a, b) => {
       // New orders first
       if (isNewOrder(a) && !isNewOrder(b)) return -1;
@@ -113,7 +113,8 @@ const AdminOrders: React.FC = () => {
     setUpdateData({
       status: order.status,
       deliveryManId: order.deliveryMan?._id || '',
-      estimatedDeliveryTime: '',
+      estimatedDeliveryTime: order.estimatedDeliveryTime ? 
+        new Date(order.estimatedDeliveryTime).toTimeString().slice(0, 5) : '',
       deliveryNotes: ''
     });
     setIsDialogOpen(true);
@@ -139,7 +140,12 @@ const AdminOrders: React.FC = () => {
         updatePayload.deliveryManId = updateData.deliveryManId;
       }
       if (updateData.estimatedDeliveryTime) {
-        updatePayload.estimatedDeliveryTime = updateData.estimatedDeliveryTime;
+        // Convert time-only input to full datetime (today's date + selected time)
+        const today = new Date();
+        const [hours, minutes] = updateData.estimatedDeliveryTime.split(':');
+        const estimatedDateTime = new Date(today);
+        estimatedDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        updatePayload.estimatedDeliveryTime = estimatedDateTime;
       }
       if (updateData.deliveryNotes) {
         updatePayload.deliveryNotes = updateData.deliveryNotes;
@@ -155,14 +161,17 @@ const AdminOrders: React.FC = () => {
   };
 
   const getOrderStats = () => {
+    // Only count active orders (excluding delivered and cancelled)
+    const activeOrders = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
     const stats = {
-      total: orders.length,
-      pending: orders.filter(o => o.status === 'pending').length,
-      preparing: orders.filter(o => o.status === 'preparing').length,
-      ready: orders.filter(o => o.status === 'ready').length,
+      total: activeOrders.length,
+      pending: activeOrders.filter(o => o.status === 'pending').length,
+      preparing: activeOrders.filter(o => o.status === 'preparing').length,
+      ready: activeOrders.filter(o => o.status === 'ready').length,
+      out_for_delivery: activeOrders.filter(o => o.status === 'out_for_delivery').length,
       delivered: orders.filter(o => o.status === 'delivered').length,
       cancelled: orders.filter(o => o.status === 'cancelled').length,
-      new: orders.filter(o => isNewOrder(o)).length
+      new: activeOrders.filter(o => isNewOrder(o)).length
     };
     return stats;
   };
@@ -320,7 +329,7 @@ const AdminOrders: React.FC = () => {
             <CardContent className="p-4">
               <div className="text-center">
                 <p className="text-2xl font-bold">{stats.delivered}</p>
-                <p className="text-sm opacity-90">Delivered</p>
+                <p className="text-sm opacity-90">Delivered (History)</p>
               </div>
             </CardContent>
           </Card>
@@ -329,13 +338,18 @@ const AdminOrders: React.FC = () => {
             <CardContent className="p-4">
               <div className="text-center">
                 <p className="text-2xl font-bold">{stats.cancelled}</p>
-                <p className="text-sm opacity-90">Cancelled</p>
+                <p className="text-sm opacity-90">Cancelled (History)</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Orders List */}
+        {/* Active Orders List */}
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Active Orders</h2>
+          <p className="text-sm text-gray-600">Showing only pending, confirmed, preparing, ready, and out for delivery orders. Delivered and cancelled orders are shown in the history section.</p>
+        </div>
+
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -444,7 +458,7 @@ const AdminOrders: React.FC = () => {
                     <Label htmlFor="estimatedTime">Estimated Delivery Time</Label>
                     <Input
                       id="estimatedTime"
-                      type="datetime-local"
+                      type="time"
                       value={updateData.estimatedDeliveryTime}
                       onChange={(e) => setUpdateData(prev => ({ 
                         ...prev, 

@@ -3,11 +3,12 @@ const Users = require("../models/userModel");
 const Foods = require("../models/foodModel");
 const { makeOrderErrorHandler } = require("../utils/errorHandler");
 const nodemailer = require("nodemailer");
+const socketService = require("../services/socketService");
 
 const orderController = {
   makeOrder: async (req, res) => {
     try {
-      const { items, totalAmount, deliveryAddress } = req.body;
+      const { items, totalAmount, deliveryAddress, paymentMethod } = req.body;
       
       // Validate required fields
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -39,12 +40,34 @@ const orderController = {
         items,
         totalAmount,
         deliveryAddress,
-        status: 'pending'
+        status: 'pending', // All orders start as pending, regardless of payment method
+        payment: {
+          status: 'pending',
+          paymentMethod: paymentMethod,
+        }
       }).save();
 
       // Populate food details for response
       await order.populate('items.food');
       await order.populate('user', 'name email');
+
+      // Emit WebSocket notification for new order
+      const io = socketService.getIO();
+      if (io) {
+        const paymentInfo = paymentMethod === 'cash' ? ' (Cash on Delivery)' : ' (Card Payment)';
+        
+        io.to('admin').emit('new-order', {
+          type: 'new-order',
+          order,
+          message: `New order #${order._id} received from ${order.user.name}${paymentInfo}`
+        });
+        
+        io.to('delivery').emit('new-order', {
+          type: 'new-order',
+          order,
+          message: `New order #${order._id} available for delivery${paymentInfo}`
+        });
+      }
 
       res.status(201).json({
         message: "Order placed successfully",
@@ -102,7 +125,7 @@ const orderController = {
       const deliveryManId = req.user._id;
       const orders = await Orders.find({ 
         deliveryMan: deliveryManId,
-        status: { $in: ['ready', 'out_for_delivery'] }
+        status: { $in: ['pending', 'ready', 'out_for_delivery'] }
       })
         .populate('user', 'name email phone')
         .populate('items.food', 'name price image category')
@@ -225,6 +248,13 @@ const orderController = {
       if (status === 'delivered') {
         updateData.actualDeliveryTime = new Date();
         console.log('Setting actual delivery time');
+        
+        // Auto-confirm cash payment when order is marked as delivered
+        if (order.payment.paymentMethod === 'cash' && order.payment.status === 'pending') {
+          updateData['payment.status'] = 'paid';
+          updateData['payment.paidAt'] = new Date();
+          console.log('Auto-confirming cash payment for delivered order');
+        }
       }
 
       if (deliveryNotes) {
@@ -244,6 +274,42 @@ const orderController = {
         .populate('deliveryMan', 'name phone email');
 
       console.log('Order updated successfully:', updatedOrder._id);
+
+      // Emit WebSocket notifications for order status update
+      const io = socketService.getIO();
+      if (io) {
+        // Notify the customer
+        io.to(`user-${updatedOrder.user._id}`).emit('order-updated', {
+          type: 'order-update',
+          order: updatedOrder,
+          message: `Your order #${updatedOrder._id} status has been updated to ${updatedOrder.status}`
+        });
+
+        // Notify delivery person if assigned
+        if (updatedOrder.deliveryMan) {
+          io.to(`delivery-${updatedOrder.deliveryMan._id}`).emit('order-updated', {
+            type: 'order-update',
+            order: updatedOrder,
+            message: `Order #${updatedOrder._id} status updated to ${updatedOrder.status}`
+          });
+        }
+
+        // Notify admin
+        io.to('admin').emit('order-updated', {
+          type: 'order-update',
+          order: updatedOrder,
+          message: `Order #${updatedOrder._id} status updated to ${updatedOrder.status} by ${userRole}`
+        });
+
+        // If delivery person was assigned, notify them
+        if (deliveryManId && deliveryMan) {
+          io.to(`delivery-${deliveryManId}`).emit('delivery-assigned', {
+            type: 'delivery-assigned',
+            order: updatedOrder,
+            message: `You have been assigned to deliver order #${updatedOrder._id}`
+          });
+        }
+      }
 
       res.status(200).json({
         message: "Order updated successfully",
@@ -416,6 +482,119 @@ const orderController = {
     } catch (error) {
       console.error('Error in getUserNotifications:', error);
       return res.status(500).json({ message: error.message });
+    }
+  },
+
+  // Cancel order (user only, pending status only)
+  cancelOrder: async (req, res) => {
+    try {
+      const { id: orderId } = req.params;
+      const userId = req.user._id;
+
+      console.log('=== Cancel Order Request ===');
+      console.log('Order ID:', orderId);
+      console.log('User ID:', userId);
+
+      // Find the order
+      const order = await Orders.findById(orderId)
+        .populate('user', 'name email')
+        .populate('items.food', 'name price');
+
+      if (!order) {
+        console.log('Order not found:', orderId);
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      console.log('Order found:', {
+        id: order._id,
+        status: order.status,
+        paymentStatus: order.payment?.status,
+        userId: order.user?._id
+      });
+
+      // Check if user owns the order
+      if (!order.user || String(order.user._id) !== String(userId)) {
+        console.log('Unauthorized: User', userId, 'trying to cancel order owned by', order.user?._id);
+        return res.status(403).json({ message: 'Unauthorized to cancel this order' });
+      }
+
+      // Check if order is in pending status
+      if (order.status !== 'pending') {
+        return res.status(400).json({ 
+          message: 'Order cannot be cancelled. Only pending orders can be cancelled.' 
+        });
+      }
+
+      // Check if order is already paid
+      if (order.payment.status === 'paid') {
+        return res.status(400).json({ 
+          message: 'Order cannot be cancelled. Payment has already been processed.' 
+        });
+      }
+
+      // Update order status to cancelled
+      order.status = 'cancelled';
+      order.cancelledAt = new Date();
+      await order.save();
+
+      console.log('Order successfully cancelled:', order._id);
+
+      // Emit WebSocket notification (handle errors gracefully)
+      try {
+        const io = socketService.getIO();
+        if (io) {
+          // Notify customer
+          io.to(`user-${order.user._id}`).emit('order-updated', {
+            type: 'order-update',
+            order,
+            message: `Your order #${order._id.slice(-6)} has been cancelled`
+          });
+
+          // Notify admin
+          io.to('admin').emit('order-updated', {
+            type: 'order-update',
+            order,
+            message: `Order #${order._id.slice(-6)} has been cancelled by customer`
+          });
+
+          // Notify delivery person if assigned
+          if (order.deliveryMan) {
+            io.to(`delivery-${order.deliveryMan._id}`).emit('order-updated', {
+              type: 'order-update',
+              order,
+              message: `Order #${order._id.slice(-6)} has been cancelled`
+            });
+          }
+          console.log('WebSocket notifications sent successfully');
+        }
+      } catch (wsError) {
+        console.error('WebSocket notification error (non-critical):', wsError);
+        // Don't fail the request if WebSocket fails
+      }
+
+      console.log('Sending success response for cancelled order:', order._id);
+      
+      // Ensure order is properly populated for response
+      const responseOrder = await Orders.findById(order._id)
+        .populate('user', 'name email')
+        .populate('items.food', 'name price');
+      
+      res.json({
+        message: 'Order cancelled successfully',
+        order: responseOrder,
+      });
+    } catch (error) {
+      console.error('Cancel order error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        orderId: req.params.id,
+        userId: req.user?._id
+      });
+      res.status(500).json({ 
+        message: 'Failed to cancel order',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      });
     }
   },
 };

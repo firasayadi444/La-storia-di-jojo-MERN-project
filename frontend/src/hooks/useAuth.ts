@@ -8,14 +8,14 @@ export const useAuth = () => {
     // Check token on mount
     validateAndRefreshToken();
 
-    // Set up periodic token validation (every 30 seconds)
+    // Set up periodic token validation (every 5 minutes)
     intervalRef.current = setInterval(() => {
       const isValid = validateAndRefreshToken();
       if (!isValid) {
         // Token is invalid, logout will be handled by validateAndRefreshToken
         return;
       }
-    }, 30000); // 30 seconds
+    }, 300000); // 5 minutes (300000ms)
 
     // Cleanup on unmount
     return () => {

@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import StripePayment from '@/components/StripePayment';
+import { CheckCircle } from 'lucide-react';
 
 const Checkout: React.FC = () => {
   const { items, getTotalPrice, clearCart } = useCart();
@@ -24,6 +26,8 @@ const Checkout: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [showPayment, setShowPayment] = useState(false);
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -67,17 +71,21 @@ const Checkout: React.FC = () => {
       };
 
       // Call backend API to create order
-      await apiService.makeOrder(orderDataForBackend);
-
-      // Clear cart after successful order
-      clearCart();
-
-      toast({
-        title: "Order placed successfully!",
-        description: `Your order for €${total.toFixed(2)} has been confirmed.`,
-      });
-
-      navigate('/orders');
+      const response = await apiService.makeOrder(orderDataForBackend);
+      
+      if (paymentMethod === 'card') {
+        // For card payments, show Stripe payment form
+        setOrderId(response.order._id);
+        setShowPayment(true);
+      } else {
+        // For cash payments, complete the order
+        clearCart();
+        toast({
+          title: "Order placed successfully!",
+          description: `Your order for $${total.toFixed(2)} has been confirmed. You will pay cash on delivery.`,
+        });
+        navigate('/orders');
+      }
     } catch (error: any) {
       toast({
         title: "Order failed",
@@ -87,6 +95,24 @@ const Checkout: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePaymentSuccess = (order: any) => {
+    clearCart();
+    setShowPayment(false);
+    toast({
+      title: "Payment Successful!",
+      description: `Your order for $${total.toFixed(2)} has been confirmed and paid.`,
+    });
+    navigate('/orders');
+  };
+
+  const handlePaymentError = (error: string) => {
+    toast({
+      title: "Payment Failed",
+      description: error,
+      variant: "destructive"
+    });
   };
 
   return (
@@ -243,6 +269,57 @@ const Checkout: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Payment Form */}
+        {showPayment && orderId && (
+          <div className="mt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Complete Payment</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {paymentMethod === 'card' ? (
+                  <StripePayment
+                    orderId={orderId}
+                    totalAmount={total}
+                    onPaymentSuccess={handlePaymentSuccess}
+                    onPaymentError={handlePaymentError}
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="mb-4">
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle className="h-8 w-8 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Order Placed Successfully!
+                      </h3>
+                      <p className="text-gray-600 mb-4">
+                        Your order has been placed and will be paid for in cash upon delivery.
+                      </p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-800">
+                          <strong>Order ID:</strong> #{orderId.slice(-6)}<br/>
+                          <strong>Total Amount:</strong> ${total.toFixed(2)}<br/>
+                          <strong>Payment Method:</strong> Cash on Delivery
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={() => {
+                        clearCart();
+                        navigate('/orders');
+                      }}
+                      className="w-full"
+                    >
+                      View My Orders
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );

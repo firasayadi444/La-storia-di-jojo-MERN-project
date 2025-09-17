@@ -5,7 +5,7 @@ const bcrypt = require("bcryptjs");
 require("dotenv").config();
 
 const sampleFoods = [
-
+  // BURGERS
   {
     name: "Classic Burger",
     category: "Burgers",
@@ -14,7 +14,63 @@ const sampleFoods = [
     image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop",
     available: true
   },
+ 
 
+  // PIZZAS
+  {
+    name: "Margherita Pizza",
+    category: "Pizza",
+    price: 12.99,
+    description: "Classic tomato sauce, fresh mozzarella, and basil",
+    image: "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Pepperoni Pizza",
+    category: "Pizza",
+    price: 14.99,
+    description: "Spicy pepperoni with mozzarella and tomato sauce",
+    image: "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400&h=300&fit=crop",
+    available: true
+  },
+ 
+  {
+    name: "Quattro Stagioni",
+    category: "Pizza",
+    price: 18.99,
+    description: "Artichokes, mushrooms, ham, and olives representing the four seasons",
+    image: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=400&h=300&fit=crop",
+    available: true
+  },
+
+  // PASTA
+
+  {
+    name: "Fettuccine Alfredo",
+    category: "Pasta",
+    price: 12.99,
+    description: "Creamy fettuccine with parmesan cheese and butter",
+    image: "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Penne Arrabbiata",
+    category: "Pasta",
+    price: 11.99,
+    description: "Spicy penne with tomato sauce, garlic, and red chili peppers",
+    image: "https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Lasagna Bolognese",
+    category: "Pasta",
+    price: 15.99,
+    description: "Layered pasta with meat sauce, bechamel, and parmesan cheese",
+    image: "https://images.unsplash.com/photo-1574894709920-11b28e7367e3?w=400&h=300&fit=crop",
+    available: true
+  },
+
+  // SALADS
   {
     name: "Caesar Salad",
     category: "Salads",
@@ -23,9 +79,78 @@ const sampleFoods = [
     image: "https://images.unsplash.com/photo-1551248429-40975aa4de74?w=400&h=300&fit=crop",
     available: true
   },
+  {
+    name: "Greek Salad",
+    category: "Salads",
+    price: 9.99,
+    description: "Tomatoes, cucumbers, olives, feta cheese, and olive oil dressing",
+    image: "https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400&h=300&fit=crop",
+    available: true
+  },
+ 
+  {
+    name: "Quinoa Power Bowl",
+    category: "Salads",
+    price: 11.99,
+    description: "Quinoa, kale, chickpeas, avocado, and tahini dressing",
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop",
+    available: true
+  },
 
+  // APPETIZERS
+  {
+    name: "Mozzarella Sticks",
+    category: "Appetizers",
+    price: 6.99,
+    description: "Breaded mozzarella sticks with marinara sauce",
+    image: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Garlic Bread",
+    category: "Appetizers",
+    price: 4.99,
+    description: "Crusty bread with garlic butter and herbs",
+    image: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Bruschetta",
+    category: "Appetizers",
+    price: 7.99,
+    description: "Toasted bread with tomatoes, basil, and balsamic vinegar",
+    image: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400&h=300&fit=crop",
+    available: true
+  },
 
+  // MAIN COURSES
+  {
+    name: "Grilled Salmon",
+    category: "Main Courses",
+    price: 18.99,
+    description: "Fresh Atlantic salmon with lemon herb butter and seasonal vegetables",
+    image: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Beef Tenderloin",
+    category: "Main Courses",
+    price: 24.99,
+    description: "8oz beef tenderloin with red wine reduction and roasted potatoes",
+    image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&h=300&fit=crop",
+    available: true
+  },
 
+  {
+    name: "Vegetable Stir Fry",
+    category: "Main Courses",
+    price: 12.99,
+    description: "Fresh seasonal vegetables with tofu in ginger soy sauce",
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop",
+    available: true
+  },
+
+  // DESSERTS
   {
     name: "Chocolate Cake",
     category: "Desserts",
@@ -33,7 +158,68 @@ const sampleFoods = [
     description: "Rich chocolate cake with chocolate ganache",
     image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&h=300&fit=crop",
     available: true
-  }
+  },
+  {
+    name: "Tiramisu",
+    category: "Desserts",
+    price: 7.99,
+    description: "Classic Italian dessert with coffee-soaked ladyfingers and mascarpone",
+    image: "https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Cheesecake",
+    category: "Desserts",
+    price: 6.99,
+    description: "New York style cheesecake with berry compote",
+    image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Ice Cream Sundae",
+    category: "Desserts",
+    price: 5.99,
+    description: "Three scoops of vanilla ice cream with chocolate sauce and nuts",
+    image: "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&h=300&fit=crop",
+    available: true
+  },
+
+  // BEVERAGES
+  {
+    name: "Fresh Orange Juice",
+    category: "Beverages",
+    price: 3.99,
+    description: "Freshly squeezed orange juice",
+    image: "https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Green Tea",
+    category: "Beverages",
+    price: 2.99,
+    description: "Premium green tea with honey",
+    image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&h=300&fit=crop",
+    available: true
+  },
+  {
+    name: "Sparkling Water",
+    category: "Beverages",
+    price: 2.49,
+    description: "Refreshing sparkling water with lemon",
+    image: "https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&h=300&fit=crop",
+    available: true
+  },
+
+  // SOUPS
+  {
+    name: "Tomato Basil Soup",
+    category: "Soups",
+    price: 5.99,
+    description: "Creamy tomato soup with fresh basil and croutons",
+    image: "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=300&fit=crop",
+    available: true
+  },
+
 ];
 
 const seedDatabase = async () => {
@@ -256,4 +442,4 @@ const seedDatabase = async () => {
   }
 };
 
-seedDatabase(); 
+seedDatabase();

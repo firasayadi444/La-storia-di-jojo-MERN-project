@@ -25,7 +25,9 @@ import {
   TrendingUp,
   Calendar,
   Wifi,
-  WifiOff
+  WifiOff,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 
 const DeliveryDashboard: React.FC = () => {
@@ -50,7 +52,7 @@ const DeliveryDashboard: React.FC = () => {
 
   // Check if delivery man has active orders
   const hasActiveOrders = orders.some(order => 
-    order.status === 'ready' || order.status === 'out_for_delivery'
+    order.status === 'pending' || order.status === 'ready' || order.status === 'out_for_delivery'
   );
 
   useEffect(() => {
@@ -148,6 +150,7 @@ const DeliveryDashboard: React.FC = () => {
       });
     }
   };
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -310,6 +313,26 @@ const DeliveryDashboard: React.FC = () => {
                           <span className="ml-1">{order.status.replace('_', ' ')}</span>
                         </Badge>
                       </CardTitle>
+                      {/* Payment Status */}
+                      <div className="mt-2">
+                        <Badge 
+                          variant="outline" 
+                          className={`${
+                            order.payment?.status === 'paid' 
+                              ? 'text-green-600 border-green-600' 
+                              : order.payment?.status === 'failed'
+                              ? 'text-red-600 border-red-600'
+                              : 'text-yellow-600 border-yellow-600'
+                          }`}
+                        >
+                          {order.payment?.paymentMethod === 'cash' ? (
+                            <Banknote className="h-3 w-3 mr-1" />
+                          ) : (
+                            <CreditCard className="h-3 w-3 mr-1" />
+                          )}
+                          {order.payment?.paymentMethod === 'cash' ? 'Cash' : 'Card'} - {order.payment?.status?.toUpperCase() || 'PENDING'}
+                        </Badge>
+                      </div>
                       <p className="text-sm text-gray-600 mt-1">
                         {new Date(order.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
@@ -343,13 +366,15 @@ const DeliveryDashboard: React.FC = () => {
                           <div className="flex items-center space-x-2">
                             <Clock className="h-4 w-4 text-gray-500" />
                             <span className="text-sm text-gray-600">
-                              Est. Delivery: {new Date(order.estimatedDeliveryTime).toLocaleString()}
+                              Est. Delivery: {new Date(order.estimatedDeliveryTime).toLocaleTimeString('en-US', {
+                                hour: '2-digit', minute: '2-digit', hour12: true
+                              })}
                             </span>
                           </div>
                         )}
                       </div>
                       <div className="mt-4 flex space-x-2">
-                        {order.status === 'ready' && (
+                        {(order.status === 'ready' || order.status === 'pending') && (
                           <Button
                             onClick={() => {
                               setSelectedOrder(order);

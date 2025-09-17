@@ -65,6 +65,28 @@ const orderSchema = new mongoose.Schema(
     assignedAt: {
       type: Date,
     },
+    cancelledAt: {
+      type: Date,
+    },
+    payment: {
+      status: {
+        type: String,
+        enum: ['pending', 'paid', 'failed', 'refunded'],
+        default: 'pending',
+      },
+      stripePaymentIntentId: {
+        type: String,
+      },
+      stripeChargeId: {
+        type: String,
+      },
+      paymentMethod: {
+        type: String,
+      },
+      paidAt: {
+        type: Date,
+      },
+    },
   },
   { timestamps: true }
 );

@@ -4,6 +4,7 @@ const Orders = require('../models/orderModel');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const socketService = require('../services/socketService');
 
 const deliverymanController = {
   // Submit new deliveryman application
@@ -107,6 +108,24 @@ const deliverymanController = {
         console.log(`⚠️ SMTP not configured. Manual password for ${user.email}: ${plainPassword}`);
       }
 
+      // Emit WebSocket notification
+      const io = socketService.getIO();
+      if (io) {
+        io.to(`user-${user._id}`).emit('application-updated', {
+          type: 'application-updated',
+          application: user,
+          status: 'approved',
+          message: `Your delivery application has been approved! Check your email for login credentials.`
+        });
+
+        io.to('admin').emit('application-updated', {
+          type: 'application-updated',
+          application: user,
+          status: 'approved',
+          message: `Delivery application approved for ${user.name}`
+        });
+      }
+
       res.json({
         message: 'Delivery man approved successfully.',
         email: user.email,
@@ -131,6 +150,24 @@ const deliverymanController = {
 
       user.status = 'rejected';
       await user.save();
+
+      // Emit WebSocket notification
+      const io = socketService.getIO();
+      if (io) {
+        io.to(`user-${user._id}`).emit('application-updated', {
+          type: 'application-updated',
+          application: user,
+          status: 'rejected',
+          message: `Your delivery application has been rejected.`
+        });
+
+        io.to('admin').emit('application-updated', {
+          type: 'application-updated',
+          application: user,
+          status: 'rejected',
+          message: `Delivery application rejected for ${user.name}`
+        });
+      }
 
       res.json({ message: 'Application rejected.' });
     } catch (error) {

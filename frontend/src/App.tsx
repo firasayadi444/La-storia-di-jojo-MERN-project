@@ -7,6 +7,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { AppProvider } from "./contexts/AppContext";
 import { CartProvider } from "./contexts/CartContext";
 import { AvailabilityProvider } from "./contexts/AvailabilityContext";
+import { SocketProvider } from "./contexts/SocketContext";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AuthWrapper from "./components/AuthWrapper";
@@ -40,10 +41,11 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <AvailabilityProvider>
-          <CartProvider>
-            <AppProvider>
-              <AuthWrapper>
+        <SocketProvider>
+          <AvailabilityProvider>
+            <CartProvider>
+              <AppProvider>
+                <AuthWrapper>
                 <Toaster />
                 <Sonner />
                 <TokenExpirationWarning />
@@ -60,8 +62,8 @@ const App = () => (
                         <Route path="/cart" element={<ProtectedRoute requireAuth><Cart /></ProtectedRoute>} />
                         <Route path="/checkout" element={<ProtectedRoute requireAuth><Checkout /></ProtectedRoute>} />
                         <Route path="/dashboard" element={<ProtectedRoute requireAuth requireDelivery><Dashboard /></ProtectedRoute>} />
-                        <Route path="/delivery" element={<ProtectedRoute requireAuth requireDelivery><DeliveryDashboard /></ProtectedRoute>} />
-                        <Route path="/delivery-stats" element={<ProtectedRoute requireAuth requireDelivery><DeliveryStats /></ProtectedRoute>} />
+                                 <Route path="/delivery" element={<ProtectedRoute requireAuth requireDelivery><DeliveryDashboard /></ProtectedRoute>} />
+                                 <Route path="/delivery-stats" element={<ProtectedRoute requireAuth requireDelivery><DeliveryStats /></ProtectedRoute>} />
                         <Route path="/admin/orders" element={<ProtectedRoute requireAuth requireAdmin><AdminOrders /></ProtectedRoute>} />
                         <Route path="/admin/users" element={<ProtectedRoute requireAuth requireAdmin><AdminUsers /></ProtectedRoute>} />
                         <Route path="/admin/deliverymen" element={<ProtectedRoute requireAuth requireAdmin><AdminDeliverymen /></ProtectedRoute>} />
@@ -78,10 +80,11 @@ const App = () => (
                     </main>
                   </div>
                 </BrowserRouter>
-              </AuthWrapper>
-            </AppProvider>
-          </CartProvider>
-        </AvailabilityProvider>
+                </AuthWrapper>
+              </AppProvider>
+            </CartProvider>
+          </AvailabilityProvider>
+        </SocketProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

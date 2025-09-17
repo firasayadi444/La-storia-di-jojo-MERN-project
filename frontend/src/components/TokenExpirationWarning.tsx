@@ -15,8 +15,8 @@ const TokenExpirationWarning = () => {
       const remaining = getTokenRemainingTime(token);
       setRemainingTime(remaining);
 
-      // Show warning if token expires in less than 5 minutes
-      if (remaining < 300 && remaining > 0) {
+      // Show warning if token expires in less than 10 minutes
+      if (remaining < 600 && remaining > 0) {
         setShowWarning(true);
       } else {
         setShowWarning(false);
@@ -26,8 +26,8 @@ const TokenExpirationWarning = () => {
     // Check immediately
     checkTokenExpiration();
 
-    // Check every 30 seconds
-    const interval = setInterval(checkTokenExpiration, 30000);
+    // Check every 2 minutes
+    const interval = setInterval(checkTokenExpiration, 120000);
 
     return () => clearInterval(interval);
   }, []);

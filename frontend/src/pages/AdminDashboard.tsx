@@ -226,7 +226,12 @@ const AdminDashboard: React.FC = () => {
       if (orderUpdateData.deliveryManId && orderUpdateData.status === 'out_for_delivery') {
         updateData.deliveryManId = orderUpdateData.deliveryManId;
         if (orderUpdateData.estimatedDeliveryTime) {
-          updateData.estimatedDeliveryTime = new Date(orderUpdateData.estimatedDeliveryTime);
+          // Convert time-only input to full datetime (today's date + selected time)
+          const today = new Date();
+          const [hours, minutes] = orderUpdateData.estimatedDeliveryTime.split(':');
+          const estimatedDateTime = new Date(today);
+          estimatedDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+          updateData.estimatedDeliveryTime = estimatedDateTime;
         }
       }
 
@@ -278,7 +283,8 @@ const AdminDashboard: React.FC = () => {
     setOrderUpdateData({
       status: order.status,
       deliveryManId: order.deliveryMan?._id || '',
-      estimatedDeliveryTime: ''
+      estimatedDeliveryTime: order.estimatedDeliveryTime ? 
+        new Date(order.estimatedDeliveryTime).toTimeString().slice(0, 5) : ''
     });
     setIsOrderDialogOpen(true);
   };
@@ -799,7 +805,7 @@ const AdminDashboard: React.FC = () => {
                       <Label htmlFor="estimatedTime">Estimated Delivery Time</Label>
                       <Input
                         id="estimatedTime"
-                        type="datetime-local"
+                        type="time"
                         value={orderUpdateData.estimatedDeliveryTime}
                         onChange={(e) => setOrderUpdateData(prev => ({ 
                           ...prev, 

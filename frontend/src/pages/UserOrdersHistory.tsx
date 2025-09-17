@@ -233,8 +233,8 @@ const UserOrdersHistory: React.FC = () => {
                                   </p>
                                   {order.estimatedDeliveryTime && (
                                     <p className="text-sm">
-                                      <span className="text-italian-green-600">Estimated Delivery:</span> {new Date(order.estimatedDeliveryTime).toLocaleDateString('en-US', {
-                                        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                      <span className="text-italian-green-600">Estimated Delivery:</span> {new Date(order.estimatedDeliveryTime).toLocaleTimeString('en-US', {
+                                        hour: '2-digit', minute: '2-digit', hour12: true
                                       })}
                                     </p>
                                   )}

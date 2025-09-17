@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Menu, LogOut, Home, Truck, Bell, FileText, Users, BarChart2, Inbox, Plus, Clock, Wifi, WifiOff, TrendingUp } from 'lucide-react';
+import { ShoppingCart, User, Menu, LogOut, Home, Truck, FileText, Users, BarChart2, Inbox, Plus, Clock, Wifi, WifiOff, TrendingUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useAvailability } from '../contexts/AvailabilityContext';
@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { apiService } from '../services/api';
 import type { Order } from '../services/api';
+import NotificationCenter from './NotificationCenter';
 
 const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -30,12 +31,6 @@ const Navbar: React.FC = () => {
 
   const [newOrdersCount, setNewOrdersCount] = useState(0);
   const [newDeliveryMenCount, setNewDeliveryMenCount] = useState(0);
-  const [userNotifications, setUserNotifications] = useState<Order[]>([]);
-  const [userNotificationsCount, setUserNotificationsCount] = useState(0);
-
-  // Split user notifications for dropdown
-  const activeUserNotifications = userNotifications.filter(n => n.status !== 'delivered');
-  const historyUserNotifications = userNotifications.filter(n => n.status === 'delivered' || n.status === 'cancelled');
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -54,12 +49,6 @@ const Navbar: React.FC = () => {
             const notificationsRes = await apiService.getDeliveryNotifications();
             const notifications = notificationsRes.data || notificationsRes.orders || [];
             setDeliveryNotificationsCount(notifications.length);
-          } else if (user?.role === 'user') {
-            // Fetch user notifications
-            const notificationsRes = await apiService.getUserNotifications();
-            const notifications = notificationsRes.data || [];
-            setUserNotifications(notifications);
-            setUserNotificationsCount(notifications.length);
           }
         } catch (err) {
           // Optionally handle error
@@ -279,50 +268,11 @@ const Navbar: React.FC = () => {
               </Link>
             )}
 
-            {/* User Notifications */}
-            {isAuthenticated && user?.role === 'user' && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative p-2">
-                    <Bell className="h-6 w-6 text-gray-600" />
-                    {userNotificationsCount > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-600 text-white text-xs flex items-center justify-center p-0">
-                        {userNotificationsCount}
-                      </span>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 bg-white border shadow-lg">
-                  <div className="p-2 font-semibold text-gray-700 border-b">Order Updates</div>
-                  {/* Active Orders Section */}
-                  <div className="px-2 pt-2 pb-1 text-sm font-bold text-italian-green-700">Active Orders</div>
-                  {activeUserNotifications.length === 0 ? (
-                    <div className="px-4 pb-2 text-gray-500 text-sm">No active order notifications</div>
-                  ) : (
-                    activeUserNotifications.slice(0, 5).map((notif) => (
-                      <div key={notif._id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
-                        <div className="font-medium">Order #{notif._id.slice(-6)}</div>
-                        <div className="text-xs text-gray-600">Status: {notif.status.replace('_', ' ')}</div>
-                        <div className="text-xs text-gray-500">Updated: {new Date(notif.updatedAt).toLocaleString()}</div>
-                      </div>
-                    ))
-                  )}
-                  {/* Order History Section */}
-                  <div className="px-2 pt-2 pb-1 text-sm font-bold text-italian-green-700">Order History</div>
-                  {historyUserNotifications.length === 0 ? (
-                    <div className="px-4 pb-2 text-gray-500 text-sm">No order history notifications</div>
-                  ) : (
-                    historyUserNotifications.slice(0, 5).map((notif) => (
-                      <div key={notif._id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
-                        <div className="font-medium">Order #{notif._id.slice(-6)}</div>
-                        <div className="text-xs text-gray-600">Status: {notif.status.replace('_', ' ')}</div>
-                        <div className="text-xs text-gray-500">Updated: {new Date(notif.updatedAt).toLocaleString()}</div>
-                      </div>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {/* Notifications */}
+            {isAuthenticated && (
+              <NotificationCenter />
             )}
+
 
 
 

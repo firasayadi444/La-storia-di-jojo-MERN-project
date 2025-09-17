@@ -237,7 +237,7 @@ const AdminDeliverymen: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="flex flex-col items-center">
                     {details.vehiclePhoto ? (
-                      <img src={`http://localhost:5000/api/uploads/deliveryman/${details.vehiclePhoto}`} alt="Vehicle/Bike" className="w-28 h-28 object-cover rounded border mb-1" />
+                      <img src={`http://localhost:5000/uploads/deliveryman/${details.vehiclePhoto}`} alt="Vehicle/Bike" className="w-28 h-28 object-cover rounded border mb-1" />
                     ) : (
                       <div className="w-28 h-28 flex items-center justify-center bg-gray-100 rounded border text-gray-400">No Image</div>
                     )}
@@ -245,7 +245,7 @@ const AdminDeliverymen: React.FC = () => {
                   </div>
                   <div className="flex flex-col items-center">
                     {details.facePhoto ? (
-                      <img src={`http://localhost:5000/api/uploads/deliveryman/${details.facePhoto}`} alt="Face" className="w-28 h-28 object-cover rounded border mb-1" />
+                      <img src={`http://localhost:5000/uploads/deliveryman/${details.facePhoto}`} alt="Face" className="w-28 h-28 object-cover rounded border mb-1" />
                     ) : (
                       <div className="w-28 h-28 flex items-center justify-center bg-gray-100 rounded border text-gray-400">No Image</div>
                     )}
@@ -253,7 +253,7 @@ const AdminDeliverymen: React.FC = () => {
                   </div>
                   <div className="flex flex-col items-center">
                     {details.cinPhoto ? (
-                      <img src={`http://localhost:5000/api/uploads/deliveryman/${details.cinPhoto}`} alt="CIN" className="w-28 h-28 object-cover rounded border mb-1" />
+                      <img src={`http://localhost:5000/uploads/deliveryman/${details.cinPhoto}`} alt="CIN" className="w-28 h-28 object-cover rounded border mb-1" />
                     ) : (
                       <div className="w-28 h-28 flex items-center justify-center bg-gray-100 rounded border text-gray-400">No Image</div>
                     )}
