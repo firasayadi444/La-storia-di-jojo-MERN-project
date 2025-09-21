@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useSocket } from '../contexts/SocketContext';
+import DeliveryStatusUpdater from '../components/DeliveryStatusUpdater';
+import DeliveryTrajectoryMap from '../components/DeliveryTrajectoryMap';
 import { 
   MapPin, 
   Clock, 
@@ -43,6 +45,7 @@ const DeliveryDashboard: React.FC = () => {
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<Order | null>(null);
   const { toast } = useToast();
   const { registerRefreshCallback, unregisterRefreshCallback } = useSocket();
 
@@ -349,19 +352,19 @@ const DeliveryDashboard: React.FC = () => {
                         <Badge 
                           variant="outline" 
                           className={`${
-                            order.payment?.status === 'paid' 
+                            (typeof order.payment === 'object' && order.payment?.paymentStatus === 'paid')
                               ? 'text-green-600 border-green-600' 
-                              : order.payment?.status === 'failed'
+                              : (typeof order.payment === 'object' && order.payment?.paymentStatus === 'failed')
                               ? 'text-red-600 border-red-600'
                               : 'text-yellow-600 border-yellow-600'
                           }`}
                         >
-                          {order.payment?.paymentMethod === 'cash' ? (
+                          {typeof order.payment === 'object' && order.payment?.paymentMethod === 'cash' ? (
                             <Banknote className="h-3 w-3 mr-1" />
                           ) : (
                             <CreditCard className="h-3 w-3 mr-1" />
                           )}
-                          {order.payment?.paymentMethod === 'cash' ? 'Cash' : 'Card'} - {order.payment?.status?.toUpperCase() || 'PENDING'}
+                          {typeof order.payment === 'object' && order.payment?.paymentMethod === 'cash' ? 'Cash' : 'Card'} - {typeof order.payment === 'object' ? order.payment?.paymentStatus?.toUpperCase() || 'PENDING' : 'PENDING'}
                         </Badge>
                       </div>
                       <p className="text-sm text-gray-600 mt-1">
@@ -386,7 +389,17 @@ const DeliveryDashboard: React.FC = () => {
                         </div>
                         <div className="flex items-start space-x-2">
                           <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                          <span className="text-sm text-gray-600">{order.deliveryAddress}</span>
+                          <div className="flex-1">
+                            <span className="text-sm text-gray-600">{order.deliveryAddress}</span>
+                            {(order as any).customerLocation && (order as any).customerLocation.latitude && (order as any).customerLocation.longitude && (
+                              <div className="mt-1 text-xs text-blue-600">
+                                📍 Customer Location: {(order as any).customerLocation.latitude.toFixed(6)}, {(order as any).customerLocation.longitude.toFixed(6)}
+                                {(order as any).customerLocation.accuracy && (
+                                  <span className="ml-2 text-gray-500">(±{Math.round((order as any).customerLocation.accuracy)}m)</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-medium text-gray-900">
@@ -429,6 +442,14 @@ const DeliveryDashboard: React.FC = () => {
                             Mark Delivered
                           </Button>
                         )}
+                        <Button
+                          onClick={() => setSelectedOrderForTracking(order)}
+                          variant="outline"
+                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                        >
+                          <Navigation className="h-4 w-4 mr-2" />
+                          Track
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -476,6 +497,60 @@ const DeliveryDashboard: React.FC = () => {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* My Delivery Trajectory Section */}
+        {user && (activeOrders.length > 0 || completedOrders.length > 0) && (
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Navigation className="h-6 w-6" />
+              My Delivery Trajectory
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Current Active Order Trajectory */}
+              {activeOrders.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Delivery</h3>
+                  {activeOrders.map((order) => (
+                    <DeliveryTrajectoryMap
+                      key={order._id}
+                      orderId={order._id}
+                      deliveryManId={user._id}
+                      deliveryAddress={order.deliveryAddress}
+                      deliveryAddressCoords={{
+                        lat: 40.7589, // This would come from geocoding the address
+                        lng: -73.9851
+                      }}
+                      customerLocation={order.customerLocation}
+                      onLocationUpdate={(location) => {
+                        console.log('Location update for order:', order._id, location);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              
+              {/* Recent Completed Order Trajectory */}
+              {completedOrders.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Delivery</h3>
+                  <DeliveryTrajectoryMap
+                    orderId={completedOrders[0]._id}
+                    deliveryManId={user._id}
+                    deliveryAddress={completedOrders[0].deliveryAddress}
+                    deliveryAddressCoords={{
+                      lat: 40.7589, // This would come from geocoding the address
+                      lng: -73.9851
+                    }}
+                    customerLocation={completedOrders[0].customerLocation}
+                    onLocationUpdate={(location) => {
+                      console.log('Location update for completed order:', completedOrders[0]._id, location);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -552,6 +627,25 @@ const DeliveryDashboard: React.FC = () => {
                 </div>
               )}
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delivery Status Updater Dialog */}
+      <Dialog open={!!selectedOrderForTracking} onOpenChange={() => setSelectedOrderForTracking(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Delivery Tracking & Status Update</DialogTitle>
+          </DialogHeader>
+          {selectedOrderForTracking && (
+            <DeliveryStatusUpdater
+              order={selectedOrderForTracking as any}
+              onStatusUpdate={(newStatus) => {
+                // Refresh orders when status is updated
+                fetchData(true);
+                setSelectedOrderForTracking(null);
+              }}
+            />
           )}
         </DialogContent>
       </Dialog>

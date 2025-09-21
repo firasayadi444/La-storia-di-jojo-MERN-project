@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X, RefreshCw, Navigation } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService, Order } from '../services/api';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { useSocket } from '../contexts/SocketContext';
 const UserOrders: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -31,6 +33,27 @@ const UserOrders: React.FC = () => {
 
   useEffect(() => {
     fetchOrders();
+    
+    // Check for any stored order updates from when component was unmounted
+    const checkStoredUpdates = () => {
+      const storedUpdate = localStorage.getItem('latest-order-update');
+      if (storedUpdate) {
+        try {
+          const update = JSON.parse(storedUpdate);
+          const timeDiff = Date.now() - update.timestamp;
+          // Only process updates from the last 30 seconds
+          if (timeDiff < 30000) {
+            fetchOrders(true);
+          }
+          // Clear the stored update after processing
+          localStorage.removeItem('latest-order-update');
+        } catch (error) {
+          console.error('Error processing stored order update:', error);
+        }
+      }
+    };
+    
+    checkStoredUpdates();
   }, []);
 
   // Register WebSocket refresh callback
@@ -40,10 +63,18 @@ const UserOrders: React.FC = () => {
       fetchOrders(true); // Show refresh indicator
     });
 
+    // Also listen for global order-updated events
+    const handleGlobalOrderUpdate = (event: CustomEvent) => {
+      fetchOrders(true);
+    };
+
+    window.addEventListener('order-updated', handleGlobalOrderUpdate as EventListener);
+
     return () => {
       unregisterRefreshCallback(refreshKey);
+      window.removeEventListener('order-updated', handleGlobalOrderUpdate as EventListener);
     };
-  }, [registerRefreshCallback, unregisterRefreshCallback]);
+  }, []); // Remove dependencies to prevent re-registration
 
   const fetchOrders = async (showRefreshIndicator = false) => {
     try {
@@ -240,14 +271,14 @@ const UserOrders: React.FC = () => {
                       <Badge 
                         variant="outline" 
                         className={`${
-                          order.payment?.status === 'paid' 
+                          (typeof order.payment === 'object' && order.payment?.paymentStatus === 'paid')
                             ? 'text-green-600 border-green-600' 
-                            : order.payment?.status === 'failed'
+                            : (typeof order.payment === 'object' && order.payment?.paymentStatus === 'failed')
                             ? 'text-red-600 border-red-600'
                             : 'text-yellow-600 border-yellow-600'
                         }`}
                       >
-                        {order.payment?.paymentMethod === 'cash' ? '💵 Cash' : '💳 Card'} - {order.payment?.status?.toUpperCase() || 'PENDING'}
+                        {typeof order.payment === 'object' && order.payment?.paymentMethod === 'cash' ? '💵 Cash' : '💳 Card'} - {typeof order.payment === 'object' ? order.payment?.paymentStatus?.toUpperCase() || 'PENDING' : 'PENDING'}
                       </Badge>
                     </div>
                   </div>
@@ -356,6 +387,19 @@ const UserOrders: React.FC = () => {
 
                   {/* Action Buttons */}
                   <div className="flex justify-end space-x-2 pt-4 border-t border-italian-cream-200">
+                    {/* Track Delivery Button for Active Orders */}
+                    {['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/track-delivery/${order._id}`)}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                      >
+                        <Navigation className="h-4 w-4 mr-2" />
+                        Track Delivery
+                      </Button>
+                    )}
+
                     {/* Cancel Button for Pending Orders */}
                     {order.status === 'pending' && (
                       <Button

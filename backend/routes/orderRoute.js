@@ -13,6 +13,7 @@ router.post("/order/new", authMiddleware, orderController.makeOrder);
 router.get("/orders", adminAuthMiddleware, orderController.getAllOrders);
 router.get("/orders/user", authMiddleware, orderController.getUserOrders);
 router.get("/orders/delivery", authMiddleware, orderController.getDeliveryOrders);
+router.get("/orders/:id/customer-location", authMiddleware, orderController.getOrderCustomerLocation);
 router.get("/delivery-men", authMiddleware, orderController.getAvailableDeliveryMen);
 router.put("/orders/:id/cancel", authMiddleware, orderController.cancelOrder);
 router.put("/orders/:id/status", authMiddleware, orderController.updateOrderStatus);

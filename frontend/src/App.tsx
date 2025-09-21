@@ -34,6 +34,7 @@ import DeliveryStats from './pages/DeliveryStats';
 import UserOrdersHistory from './pages/UserOrdersHistory';
 import Profile from './pages/Profile';
 import AdminOrdersHistory from './pages/AdminOrdersHistory';
+import DeliveryTrackingPage from './pages/DeliveryTrackingPage';
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,7 @@ const App = () => (
                         <Route path="/admin/add-food" element={<ProtectedRoute requireAuth requireAdmin><AdminFoodManagement /></ProtectedRoute>} />
                         <Route path="/orders" element={<ProtectedRoute requireAuth requireUser><UserOrders /></ProtectedRoute>} />
                         <Route path="/orders/history" element={<ProtectedRoute requireAuth requireUser><UserOrdersHistory /></ProtectedRoute>} />
+                        <Route path="/track-delivery/:orderId" element={<ProtectedRoute requireAuth requireUser><DeliveryTrackingPage /></ProtectedRoute>} />
                         <Route path="/profile" element={<ProtectedRoute requireAuth requireUser><Profile /></ProtectedRoute>} />
                         <Route path="/admin/ordershistory" element={<ProtectedRoute requireAuth requireAdmin><AdminOrdersHistory /></ProtectedRoute>} />
                         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

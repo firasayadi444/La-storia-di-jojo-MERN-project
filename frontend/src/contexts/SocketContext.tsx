@@ -67,7 +67,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Listen for order updates
       newSocket.on('order-updated', (data) => {
-        console.log('🔄 Order updated received via WebSocket:', data);
         addNotification({
           id: `order-${data.order._id}-${Date.now()}`,
           type: 'order-update',
@@ -79,10 +78,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
         
         // Trigger data refresh for all registered callbacks
-        console.log('🔄 Triggering refresh callbacks for order update, count:', refreshCallbacks.size);
         refreshCallbacks.forEach((callback, key) => {
           try {
-            console.log(`🔄 Executing refresh callback for order update: ${key}`);
             callback();
           } catch (error) {
             console.error('Error in refresh callback:', error);
@@ -105,7 +102,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Listen for new orders (admin and delivery)
       newSocket.on('new-order', (data) => {
-        console.log('🔔 New order received via WebSocket:', data);
         addNotification({
           id: `new-order-${data.order._id}-${Date.now()}`,
           type: 'new-order',
@@ -117,10 +113,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
         
         // Trigger data refresh for all registered callbacks
-        console.log('🔄 Triggering refresh callbacks, count:', refreshCallbacks.size);
         refreshCallbacks.forEach((callback, key) => {
           try {
-            console.log(`🔄 Executing refresh callback for: ${key}`);
             callback();
           } catch (error) {
             console.error('Error in refresh callback:', error);
@@ -139,6 +133,41 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           timestamp: new Date(),
           read: false
         });
+      });
+
+      // Listen for order updates (payment confirmations, status changes)
+      newSocket.on('order-updated', (data) => {
+        addNotification({
+          id: `order-updated-${data.order._id}-${Date.now()}`,
+          type: 'order-updated',
+          title: 'Order Updated',
+          message: data.message,
+          order: data.order,
+          timestamp: new Date(),
+          read: false
+        });
+        
+        // Trigger data refresh for all registered callbacks
+        refreshCallbacks.forEach((callback, key) => {
+          try {
+            callback();
+          } catch (error) {
+            console.error('Error in refresh callback:', error);
+          }
+        });
+        
+        // Store the latest order update for when components mount
+        localStorage.setItem('latest-order-update', JSON.stringify({
+          order: data.order,
+          message: data.message,
+          timestamp: Date.now()
+        }));
+        
+        // Also trigger a global refresh event that persists across navigation
+        // This ensures the orders page gets updated even if it's not mounted yet
+        window.dispatchEvent(new CustomEvent('order-updated', { 
+          detail: { order: data.order, message: data.message } 
+        }));
       });
 
       setSocket(newSocket);

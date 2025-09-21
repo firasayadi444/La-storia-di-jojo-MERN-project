@@ -8,7 +8,7 @@ const socketService = require("../services/socketService");
 const orderController = {
   makeOrder: async (req, res) => {
     try {
-      const { items, totalAmount, deliveryAddress, paymentMethod } = req.body;
+      const { items, totalAmount, deliveryAddress, paymentMethod, customerLocation } = req.body;
       
       // Validate required fields
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -21,6 +21,11 @@ const orderController = {
       
       if (!deliveryAddress) {
         return res.status(400).json({ message: "Delivery address is required" });
+      }
+
+      // Validate customer location
+      if (!customerLocation || !customerLocation.latitude || !customerLocation.longitude) {
+        return res.status(400).json({ message: "Customer location is required for delivery tracking" });
       }
 
       // Get user from token (req.user is set by auth middleware)
@@ -40,11 +45,14 @@ const orderController = {
         items,
         totalAmount,
         deliveryAddress,
+        customerLocation: {
+          latitude: customerLocation.latitude,
+          longitude: customerLocation.longitude,
+          accuracy: customerLocation.accuracy || 10,
+          timestamp: new Date()
+        },
         status: 'pending', // All orders start as pending, regardless of payment method
-        payment: {
-          status: 'pending',
-          paymentMethod: paymentMethod,
-        }
+        // payment will be set when payment entity is created
       }).save();
 
       // Populate food details for response
@@ -56,21 +64,18 @@ const orderController = {
       if (io) {
         const paymentInfo = paymentMethod === 'cash' ? ' (Cash on Delivery)' : ' (Card Payment)';
         
-        console.log('🔔 Emitting new-order event to admin room');
         io.to('admin').emit('new-order', {
           type: 'new-order',
           order,
           message: `New order #${order._id} received from ${order.user.name}${paymentInfo}`
         });
         
-        console.log('🔔 Emitting new-order event to delivery room');
         io.to('delivery').emit('new-order', {
           type: 'new-order',
           order,
           message: `New order #${order._id} available for delivery${paymentInfo}`
         });
       } else {
-        console.log('❌ Socket.IO not available for new order notification');
       }
 
       res.status(201).json({
@@ -84,15 +89,14 @@ const orderController = {
 
   getAllOrders: async (req, res) => {
     try {
-      console.log('Getting all orders...'); // Debug log
       
       const orders = await Orders.find()
         .populate('user', 'name email')
         .populate('items.food', 'name price image category')
         .populate('deliveryMan', 'name phone')
+        .populate('payment')
         .sort({ createdAt: -1 });
       
-      console.log(`Found ${orders.length} orders`); // Debug log
       
       res.status(200).json({ 
         message: "Orders retrieved successfully",
@@ -111,11 +115,66 @@ const orderController = {
       const orders = await Orders.find({ user: userId })
         .populate('items.food', 'name price image category')
         .populate('deliveryMan', 'name phone')
+        .populate('payment')
         .sort({ createdAt: -1 });
+      
+      console.log('📊 getUserOrders: Found orders:', orders.length);
+      console.log('📊 getUserOrders: First order payment data:', orders[0] ? {
+        orderId: orders[0]._id,
+        payment: orders[0].payment,
+        paymentStatus: orders[0].payment?.paymentStatus,
+        paymentMethod: orders[0].payment?.paymentMethod
+      } : 'No orders');
       
       res.status(200).json({ orders });
     } catch (error) {
       return res.status(500).json({ message: error.message });
+    }
+  },
+
+  getOrderCustomerLocation: async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const userId = req.user._id;
+      const userRole = req.user.role;
+
+      // Find the order
+      const order = await Orders.findById(orderId)
+        .populate('user', 'name email phone')
+        .populate('deliveryMan', 'name phone');
+
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      // Check permissions: user must be the customer, delivery person, or admin
+      const isCustomer = String(order.user._id) === String(userId);
+      const isDeliveryMan = order.deliveryMan && String(order.deliveryMan._id) === String(userId);
+      const isAdmin = userRole === 'admin';
+
+      if (!isCustomer && !isDeliveryMan && !isAdmin) {
+        return res.status(403).json({ message: 'Access denied. You can only view location for your own orders or assigned deliveries.' });
+      }
+
+      // Return customer location if available
+      if (!order.customerLocation) {
+        return res.status(404).json({ message: 'Customer location not available for this order' });
+      }
+
+      res.status(200).json({
+        message: 'Customer location retrieved successfully',
+        orderId: order._id,
+        customerLocation: order.customerLocation,
+        customer: {
+          name: order.user.name,
+          phone: order.user.phone,
+          email: order.user.email
+        },
+        deliveryAddress: order.deliveryAddress
+      });
+    } catch (error) {
+      console.error('Error getting customer location:', error);
+      return res.status(500).json({ message: 'Failed to retrieve customer location' });
     }
   },
 
@@ -133,6 +192,7 @@ const orderController = {
       })
         .populate('user', 'name email phone')
         .populate('items.food', 'name price image category')
+        .populate('payment')
         .sort({ createdAt: -1 });
       
       res.status(200).json({ orders });
@@ -254,10 +314,18 @@ const orderController = {
         console.log('Setting actual delivery time');
         
         // Auto-confirm cash payment when order is marked as delivered
-        if (order.payment.paymentMethod === 'cash' && order.payment.status === 'pending') {
-          updateData['payment.status'] = 'paid';
-          updateData['payment.paidAt'] = new Date();
-          console.log('Auto-confirming cash payment for delivered order');
+        // We need to populate the payment field first to check its properties
+        if (order.payment) {
+          const Payment = require('../models/paymentModel');
+          const payment = await Payment.findById(order.payment);
+          if (payment && payment.paymentMethod === 'cash' && payment.paymentStatus === 'pending') {
+            // Update the payment status to paid
+            await Payment.findByIdAndUpdate(order.payment, {
+              paymentStatus: 'paid',
+              paidAt: new Date()
+            });
+            console.log('Auto-confirmed cash payment for delivered order');
+          }
         }
       }
 
@@ -275,7 +343,8 @@ const orderController = {
       )
         .populate('user', 'name email')
         .populate('items.food', 'name price image category')
-        .populate('deliveryMan', 'name phone email');
+        .populate('deliveryMan', 'name phone email')
+        .populate('payment', 'paymentMethod paymentStatus paidAt');
 
       console.log('Order updated successfully:', updatedOrder._id);
 
@@ -447,6 +516,7 @@ const orderController = {
       })
         .populate('user', 'name email phone')
         .populate('items.food', 'name price image category')
+        .populate('payment')
         .sort({ createdAt: -1 });
       res.status(200).json({ orders });
     } catch (error) {
@@ -459,7 +529,8 @@ const orderController = {
       const orders = await Orders.find({ status: 'delivered' })
         .populate('user', 'name email')
         .populate('items.food', 'name price image category')
-        .populate('deliveryMan', 'name phone');
+        .populate('deliveryMan', 'name phone')
+        .populate('payment');
       res.status(200).json({ orders });
     } catch (error) {
       return res.status(500).json({ message: error.message });
@@ -529,11 +600,15 @@ const orderController = {
         });
       }
 
-      // Check if order is already paid
-      if (order.payment.status === 'paid') {
-        return res.status(400).json({ 
-          message: 'Order cannot be cancelled. Payment has already been processed.' 
-        });
+      // Check if order is already paid (through payment entity)
+      if (order.payment) {
+        const Payment = require('../models/paymentModel');
+        const payment = await Payment.findById(order.payment);
+        if (payment && payment.paymentStatus === 'paid') {
+          return res.status(400).json({ 
+            message: 'Order cannot be cancelled. Payment has already been processed.' 
+          });
+        }
       }
 
       // Update order status to cancelled

@@ -36,6 +36,24 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    customerLocation: {
+      latitude: {
+        type: Number,
+        required: true,
+      },
+      longitude: {
+        type: Number,
+        required: true,
+      },
+      accuracy: {
+        type: Number,
+        default: 10,
+      },
+      timestamp: {
+        type: Date,
+        default: Date.now,
+      },
+    },
     deliveryMan: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'user',
@@ -69,23 +87,8 @@ const orderSchema = new mongoose.Schema(
       type: Date,
     },
     payment: {
-      status: {
-        type: String,
-        enum: ['pending', 'paid', 'failed', 'refunded'],
-        default: 'pending',
-      },
-      stripePaymentIntentId: {
-        type: String,
-      },
-      stripeChargeId: {
-        type: String,
-      },
-      paymentMethod: {
-        type: String,
-      },
-      paidAt: {
-        type: Date,
-      },
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'payment',
     },
   },
   { timestamps: true }

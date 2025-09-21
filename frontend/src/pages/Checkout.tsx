@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,6 +28,10 @@ const Checkout: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
   const [orderId, setOrderId] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
+  const [customerLocation, setCustomerLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
+  const [showLocationConsent, setShowLocationConsent] = useState<boolean>(false);
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -46,6 +50,169 @@ const Checkout: React.FC = () => {
 
   const total = getTotalPrice();
 
+  // Show location consent dialog on component mount
+  useEffect(() => {
+    setShowLocationConsent(true);
+  }, []);
+
+  const handleLocationConsent = (consent: boolean) => {
+    setShowLocationConsent(false);
+    
+    if (consent) {
+      requestLocation();
+    } else {
+      setLocationPermission('denied');
+      setLocationError('Location access is required for delivery tracking');
+    }
+  };
+
+  const requestLocation = () => {
+    if (navigator.geolocation) {
+      setLocationPermission('pending');
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const accuracy = position.coords.accuracy;
+          const isAccurateEnough = accuracy <= 100; // Within 100 meters
+          
+          setCustomerLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+          setLocationPermission('granted');
+          setLocationError(null);
+          
+          if (!isAccurateEnough) {
+            toast({
+              title: "Location Accuracy Warning",
+              description: `Location accuracy is ±${Math.round(accuracy)}m. This may affect delivery precision.`,
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Location Access Granted",
+              description: `Your location has been captured (accuracy: ±${Math.round(accuracy)}m)`,
+            });
+          }
+        },
+        (error) => {
+          setLocationPermission('denied');
+          let errorMessage = 'Location access is required for delivery tracking';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Location access denied. Please enable location permissions in your browser settings.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Location information is unavailable. Please check your GPS settings.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Location request timed out. Please try again.';
+              break;
+            default:
+              errorMessage = 'An unknown error occurred while retrieving location.';
+              break;
+          }
+          
+          setLocationError(errorMessage);
+          console.error('Location error:', error);
+          toast({
+            title: "Location Required",
+            description: errorMessage,
+            variant: "destructive"
+          });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 300000 // 5 minutes
+        }
+      );
+    } else {
+      setLocationPermission('denied');
+      setLocationError('Geolocation is not supported by this browser');
+      toast({
+        title: "Location Not Supported",
+        description: "Your browser doesn't support location services. Please use a modern browser.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const retryLocation = () => {
+    if (navigator.geolocation) {
+      setLocationPermission('pending');
+      setLocationError(null);
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const accuracy = position.coords.accuracy;
+          const isAccurateEnough = accuracy <= 100;
+          
+          setCustomerLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+          setLocationPermission('granted');
+          setLocationError(null);
+          
+          if (!isAccurateEnough) {
+            toast({
+              title: "Location Accuracy Warning",
+              description: `Location accuracy is ±${Math.round(accuracy)}m. This may affect delivery precision.`,
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Location Updated",
+              description: `Location refreshed (accuracy: ±${Math.round(accuracy)}m)`,
+            });
+          }
+        },
+        (error) => {
+          setLocationPermission('denied');
+          let errorMessage = 'Unable to get your location';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Location access denied. Please enable location permissions.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Location information is unavailable. Please check your GPS.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Location request timed out. Please try again.';
+              break;
+            default:
+              errorMessage = 'An unknown error occurred while retrieving location.';
+              break;
+          }
+          
+          setLocationError(errorMessage);
+          console.error('Location error:', error);
+          toast({
+            title: "Location Error",
+            description: errorMessage,
+            variant: "destructive"
+          });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0 // Force fresh location
+        }
+      );
+    } else {
+      setLocationError('Geolocation is not supported by this browser');
+      toast({
+        title: "Location Not Supported",
+        description: "Your browser doesn't support location services.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setOrderData(prev => ({
       ...prev,
@@ -55,6 +222,17 @@ const Checkout: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if location is required
+    if (locationPermission !== 'granted' || !customerLocation) {
+      toast({
+        title: "Location Required",
+        description: "Please allow location access to place your order",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -67,7 +245,12 @@ const Checkout: React.FC = () => {
         })),
         totalAmount: total,
         deliveryAddress: orderData.address,
-        paymentMethod
+        paymentMethod,
+        customerLocation: {
+          latitude: customerLocation.lat,
+          longitude: customerLocation.lng,
+          accuracy: customerLocation.accuracy
+        }
       };
 
       // Call backend API to create order
@@ -82,7 +265,7 @@ const Checkout: React.FC = () => {
         clearCart();
         toast({
           title: "Order placed successfully!",
-          description: `Your order for $${total.toFixed(2)} has been confirmed. You will pay cash on delivery.`,
+          description: `Your order for €${total.toFixed(2)} has been confirmed. You will pay cash on delivery.`,
         });
         navigate('/orders');
       }
@@ -102,7 +285,7 @@ const Checkout: React.FC = () => {
     setShowPayment(false);
     toast({
       title: "Payment Successful!",
-      description: `Your order for $${total.toFixed(2)} has been confirmed and paid.`,
+      description: `Your order for €${total.toFixed(2)} has been confirmed and paid.`,
     });
     navigate('/orders');
   };
@@ -116,7 +299,57 @@ const Checkout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 py-8">
+    <>
+      {/* Location Consent Dialog */}
+      {showLocationConsent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="max-w-md mx-4 bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-600">
+                <MapPin className="h-5 w-5" />
+                Location Access Required
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-gray-600">
+                To provide accurate delivery tracking, we need access to your current location. 
+                This helps our delivery team find you more easily.
+              </p>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">What we use your location for:</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• Accurate delivery tracking</li>
+                  <li>• Real-time delivery updates</li>
+                  <li>• Better delivery route planning</li>
+                  <li>• Improved delivery experience</li>
+                </ul>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Privacy:</strong> Your location is only used for this order and is not stored permanently.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => handleLocationConsent(true)}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                >
+                  Allow Location Access
+                </Button>
+                <Button
+                  onClick={() => handleLocationConsent(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Continue Without Location
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8 text-center">
@@ -204,6 +437,83 @@ const Checkout: React.FC = () => {
                   />
                 </div>
 
+                {/* Location Section */}
+                <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-blue-600" />
+                    <Label className="text-lg font-semibold text-blue-800">Location Access Required</Label>
+                  </div>
+                  <p className="text-sm text-blue-700">
+                    We need your location to provide accurate delivery tracking and estimated arrival times.
+                  </p>
+                  
+                  {locationPermission === 'pending' && (
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <span className="text-sm">Requesting location access...</span>
+                    </div>
+                  )}
+                  
+                  {locationPermission === 'granted' && customerLocation && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-green-600">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Location captured successfully</span>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-green-200">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-600">Coordinates:</span>
+                            <div className="font-mono text-green-800">
+                              {customerLocation.lat.toFixed(6)}, {customerLocation.lng.toFixed(6)}
+                            </div>
+                          </div>
+                          {customerLocation.accuracy && (
+                            <div>
+                              <span className="text-gray-600">Accuracy:</span>
+                              <div className={`font-medium ${
+                                customerLocation.accuracy <= 10 ? 'text-green-600' :
+                                customerLocation.accuracy <= 50 ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                ±{Math.round(customerLocation.accuracy)}m
+                                {customerLocation.accuracy > 100 && (
+                                  <span className="ml-1 text-xs">⚠️ Low accuracy</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {customerLocation.accuracy && customerLocation.accuracy > 100 && (
+                          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                            ⚠️ Location accuracy is low. This may affect delivery precision. Consider moving to an open area for better GPS signal.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {locationPermission === 'denied' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-red-600">
+                        <MapPin className="h-4 w-4" />
+                        <span className="text-sm font-medium">Location access denied</span>
+                      </div>
+                      <p className="text-sm text-red-600">{locationError}</p>
+                      <Button
+                        type="button"
+                        onClick={retryLocation}
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                      >
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="notes" className="flex items-center gap-2 text-sm font-semibold">
                     <Clock className="h-4 w-4" />
@@ -265,13 +575,18 @@ const Checkout: React.FC = () => {
 
                 <Button
                   type="submit"
-                  disabled={isLoading}
-                  className="w-full btn-gradient text-white py-4 text-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mt-8"
+                  disabled={isLoading || locationPermission !== 'granted' || !customerLocation}
+                  className="w-full btn-gradient text-white py-4 text-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mt-8 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isLoading ? (
                     <>
                       <Clock className="h-5 w-5 mr-2 animate-spin" />
                       Placing Order...
+                    </>
+                  ) : locationPermission !== 'granted' || !customerLocation ? (
+                    <>
+                      <MapPin className="h-5 w-5 mr-2" />
+                      Location Required
                     </>
                   ) : (
                     <>
@@ -394,7 +709,7 @@ const Checkout: React.FC = () => {
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <p className="text-sm text-blue-800">
                           <strong>Order ID:</strong> #{orderId.slice(-6)}<br/>
-                          <strong>Total Amount:</strong> ${total.toFixed(2)}<br/>
+                          <strong>Total Amount:</strong> €{total.toFixed(2)}<br/>
                           <strong>Payment Method:</strong> Cash on Delivery
                         </p>
                       </div>
@@ -416,6 +731,7 @@ const Checkout: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

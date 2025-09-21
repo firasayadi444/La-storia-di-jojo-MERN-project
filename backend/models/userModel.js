@@ -45,6 +45,11 @@ const userSchema = new mongoose.Schema(
         default: [0, 0],
       },
     },
+    // Reference to latest location for delivery tracking
+    latestLocation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'location',
+    },
     status: {
       type: String,
       enum: ['pending', 'active', 'rejected'],

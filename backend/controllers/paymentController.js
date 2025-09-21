@@ -1,6 +1,8 @@
 const stripe = require('../config/stripe');
 const Orders = require('../models/orderModel');
 const Users = require('../models/userModel');
+const Payment = require('../models/paymentModel');
+const socketService = require('../services/socketService');
 
 const paymentController = {
   // Create payment intent for an order
@@ -9,10 +11,6 @@ const paymentController = {
       const { orderId } = req.params;
       const userId = req.user._id;
 
-      console.log('🚀 Creating payment intent for order:', orderId);
-      console.log('👤 User ID:', userId);
-      console.log('🔑 Stripe secret key configured:', !!process.env.STRIPE_SECRET_KEY);
-      console.log('🔑 Stripe key starts with sk_test:', process.env.STRIPE_SECRET_KEY?.startsWith('sk_test'));
 
       // Check if Stripe is configured
       if (!process.env.STRIPE_SECRET_KEY) {
@@ -23,7 +21,6 @@ const paymentController = {
       }
 
       // Find the order
-      console.log('🔍 Looking for order:', orderId);
       const order = await Orders.findById(orderId)
         .populate('user', 'name email')
         .populate('items.food', 'name price');
@@ -33,12 +30,6 @@ const paymentController = {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      console.log('📦 Order found:', {
-        id: order._id,
-        totalAmount: order.totalAmount,
-        paymentStatus: order.payment.status,
-        userId: order.user._id
-      });
 
       // Check if user owns the order
       if (String(order.user._id) !== String(userId)) {
@@ -46,15 +37,23 @@ const paymentController = {
         return res.status(403).json({ message: 'Unauthorized to pay for this order' });
       }
 
+      // Check if payment exists and get its status
+      let paymentStatus = 'pending';
+      if (order.payment) {
+        const payment = await Payment.findById(order.payment);
+        if (payment) {
+          paymentStatus = payment.paymentStatus;
+        }
+      }
+
       // Check if order is already paid
-      if (order.payment.status === 'paid') {
+      if (paymentStatus === 'paid') {
         console.error('❌ Order already paid:', orderId);
         return res.status(400).json({ message: 'Order is already paid' });
       }
 
       // Create payment intent
       const amountInCents = Math.round(order.totalAmount * 100);
-      console.log('💰 Creating payment intent with amount:', amountInCents, 'cents ($' + order.totalAmount + ')');
       
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents, // Convert to cents
@@ -68,17 +67,34 @@ const paymentController = {
         },
       });
 
-      console.log('✅ Payment intent created:', {
-        id: paymentIntent.id,
-        status: paymentIntent.status,
-        amount: paymentIntent.amount,
-        currency: paymentIntent.currency
-      });
 
-      // Update order with payment intent ID
-      order.payment.stripePaymentIntentId = paymentIntent.id;
-      await order.save();
-      console.log('💾 Order updated with payment intent ID');
+      // Create or update payment entity
+      let payment;
+      if (order.payment) {
+        // Update existing payment
+        payment = await Payment.findById(order.payment);
+        if (payment) {
+          payment.stripePaymentIntentId = paymentIntent.id;
+          payment.paymentMethod = 'card';
+          await payment.save();
+        }
+      } else {
+        // Create new payment
+        payment = new Payment({
+          userId: userId,
+          orderId: orderId,
+          amount: order.totalAmount,
+          paymentMethod: 'card',
+          stripePaymentIntentId: paymentIntent.id,
+          paymentStatus: 'pending'
+        });
+        await payment.save();
+        
+        // Update order with payment reference
+        order.payment = payment._id;
+        await order.save();
+      }
+      
 
       res.json({
         clientSecret: paymentIntent.client_secret,
@@ -102,22 +118,31 @@ const paymentController = {
       const { paymentIntentId } = req.body;
       const userId = req.user._id;
 
-      console.log('✅ Confirming payment:', paymentIntentId);
-      console.log('👤 User ID:', userId);
 
       // Retrieve payment intent from Stripe
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      console.log('💳 Payment intent status:', paymentIntent.status);
 
       if (paymentIntent.status !== 'succeeded') {
         console.error('❌ Payment not successful, status:', paymentIntent.status);
         return res.status(400).json({ message: 'Payment not successful' });
       }
 
-      // Find the order
-      console.log('🔍 Looking for order with payment intent:', paymentIntentId);
+      // Find the order through the payment entity
+      
+      // First find the payment entity with this payment intent ID
+      const payment = await Payment.findOne({
+        stripePaymentIntentId: paymentIntentId,
+        userId: userId
+      });
+      
+      if (!payment) {
+        console.error('❌ Payment not found for payment intent:', paymentIntentId);
+        return res.status(404).json({ message: 'Payment not found' });
+      }
+      
+      // Then find the order using the payment's orderId
       const order = await Orders.findOne({
-        'payment.stripePaymentIntentId': paymentIntentId,
+        _id: payment.orderId,
         user: userId,
       });
 
@@ -126,21 +151,51 @@ const paymentController = {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      console.log('📦 Order found for confirmation:', {
-        id: order._id,
-        currentStatus: order.status,
-        currentPaymentStatus: order.payment.status
-      });
 
-      // Update order payment status
-      order.payment.status = 'paid';
-      order.payment.stripeChargeId = paymentIntent.latest_charge;
-      order.payment.paymentMethod = paymentIntent.payment_method;
-      order.payment.paidAt = new Date();
+      // Update payment entity (we already have it from the query above)
+      payment.paymentStatus = 'paid';
+      payment.stripeChargeId = paymentIntent.latest_charge;
+      payment.paidAt = new Date();
+      await payment.save();
+
+      // Update order status
       order.status = 'confirmed'; // Move order to confirmed status
-
       await order.save();
-      console.log('✅ Order payment confirmed and updated');
+
+      // Populate order with payment data for WebSocket event
+      const populatedOrder = await Orders.findById(order._id)
+        .populate('user', 'name email')
+        .populate('items.food', 'name price image category')
+        .populate('deliveryMan', 'name phone')
+        .populate('payment');
+        
+
+      // Emit WebSocket event for order update
+      const io = socketService.getIO();
+      if (io) {
+        
+        // Notify the customer
+        io.to(`user-${userId}`).emit('order-updated', {
+          type: 'order-updated',
+          order: populatedOrder,
+          message: `Your order #${order._id} payment confirmed and status updated to confirmed`
+        });
+        
+        // Notify admin
+        io.to('admin').emit('order-updated', {
+          type: 'order-updated',
+          order: populatedOrder,
+          message: `Order #${order._id} payment confirmed and status updated to confirmed`
+        });
+        
+        // Notify delivery
+        io.to('delivery').emit('order-updated', {
+          type: 'order-updated',
+          order: populatedOrder,
+          message: `Order #${order._id} payment confirmed and status updated to confirmed`
+        });
+      } else {
+      }
 
       res.json({
         message: 'Payment confirmed successfully',
@@ -167,7 +222,7 @@ const paymentController = {
       const order = await Orders.findOne({
         _id: orderId,
         user: userId,
-      }).select('payment status totalAmount');
+      }).select('payment status totalAmount').populate('payment');
 
       if (!order) {
         return res.status(404).json({ message: 'Order not found' });
@@ -199,19 +254,30 @@ const paymentController = {
         return res.status(404).json({ message: 'Order not found' });
       }
 
-      // Check if order is paid
-      if (order.payment.status !== 'paid') {
+      // Get payment entity
+      let payment = null;
+      if (order.payment) {
+        payment = await Payment.findById(order.payment);
+      }
+
+      if (!payment || payment.paymentStatus !== 'paid') {
         return res.status(400).json({ message: 'Order is not paid' });
       }
 
       // Create refund in Stripe
       const refund = await stripe.refunds.create({
-        payment_intent: order.payment.stripePaymentIntentId,
+        payment_intent: payment.stripePaymentIntentId,
         reason: reason || 'requested_by_customer',
       });
 
-      // Update order payment status
-      order.payment.status = 'refunded';
+      // Update payment entity
+      payment.paymentStatus = 'refunded';
+      payment.refundedAt = new Date();
+      payment.refundId = refund.id;
+      payment.refundReason = reason || 'requested_by_customer';
+      await payment.save();
+
+      // Update order status
       order.status = 'cancelled';
       await order.save();
 
@@ -246,19 +312,22 @@ const paymentController = {
     switch (event.type) {
       case 'payment_intent.succeeded':
         const paymentIntent = event.data.object;
-        console.log('PaymentIntent succeeded:', paymentIntent.id);
         
         // Update order status if needed
         try {
           const order = await Orders.findOne({
-            'payment.stripePaymentIntentId': paymentIntent.id,
-          });
+            payment: { $exists: true }
+          }).populate('payment');
           
-          if (order && order.payment.status === 'pending') {
-            order.payment.status = 'paid';
-            order.payment.paidAt = new Date();
-            order.status = 'confirmed';
-            await order.save();
+          if (order && order.payment && order.payment.stripePaymentIntentId === paymentIntent.id) {
+            if (order.payment.paymentStatus === 'pending') {
+              order.payment.paymentStatus = 'paid';
+              order.payment.paidAt = new Date();
+              await order.payment.save();
+              
+              order.status = 'confirmed';
+              await order.save();
+            }
           }
         } catch (error) {
           console.error('Error updating order from webhook:', error);
@@ -267,17 +336,16 @@ const paymentController = {
 
       case 'payment_intent.payment_failed':
         const failedPayment = event.data.object;
-        console.log('PaymentIntent failed:', failedPayment.id);
         
         // Update order status
         try {
           const order = await Orders.findOne({
-            'payment.stripePaymentIntentId': failedPayment.id,
-          });
+            payment: { $exists: true }
+          }).populate('payment');
           
-          if (order) {
-            order.payment.status = 'failed';
-            await order.save();
+          if (order && order.payment && order.payment.stripePaymentIntentId === failedPayment.id) {
+            order.payment.paymentStatus = 'failed';
+            await order.payment.save();
           }
         } catch (error) {
           console.error('Error updating order from webhook:', error);
@@ -285,7 +353,6 @@ const paymentController = {
         break;
 
       default:
-        console.log(`Unhandled event type ${event.type}`);
     }
 
     res.json({ received: true });

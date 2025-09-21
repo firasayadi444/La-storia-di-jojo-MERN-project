@@ -35,6 +35,44 @@ export interface Food {
   updatedAt: string;
 }
 
+export interface Payment {
+  _id: string;
+  userId: string;
+  orderId: string;
+  amount: number;
+  paymentMethod: 'card' | 'cash';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  stripePaymentId?: string;
+  stripeChargeId?: string;
+  stripePaymentIntentId?: string;
+  paidAt?: string;
+  refundedAt?: string;
+  refundId?: string;
+  refundReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Location {
+  _id: string;
+  userId: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  accuracy?: number;
+  altitude?: number;
+  speed?: number;
+  heading?: number;
+  timestamp: string;
+  isActive: boolean;
+  location?: {
+    type: 'Point';
+    coordinates: [number, number];
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Order {
   _id: string;
   user: User;
@@ -46,6 +84,12 @@ export interface Order {
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
   deliveryAddress: string;
+  customerLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    timestamp?: string;
+  };
   deliveryMan?: User;
   estimatedDeliveryTime?: string;
   actualDeliveryTime?: string;
@@ -54,12 +98,7 @@ export interface Order {
   foodRating?: number;
   feedbackComment?: string;
   assignedAt?: string;
-  payment?: {
-    paymentMethod: 'card' | 'cash';
-    status: 'pending' | 'paid' | 'failed' | 'refunded';
-    paidAt?: string;
-    paymentIntentId?: string;
-  };
+  payment?: Payment | string; // Can be populated or just reference
   cancelledAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -298,6 +337,32 @@ class ApiService {
       },
     });
     return handleResponse<Order[]>(response);
+  }
+
+  async getOrderCustomerLocation(orderId: string): Promise<ApiResponse<{
+    orderId: string;
+    customerLocation: {
+      latitude: number;
+      longitude: number;
+      accuracy?: number;
+      timestamp?: string;
+    };
+    customer: {
+      name: string;
+      phone?: string;
+      email: string;
+    };
+    deliveryAddress: string;
+  }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/orders/${orderId}/customer-location`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(response);
   }
 
   async getAvailableDeliveryMen(): Promise<ApiResponse<User[]>> {
@@ -561,8 +626,6 @@ class ApiService {
   // Payment endpoints
   async createPaymentIntent(orderId: string): Promise<ApiResponse<{ clientSecret: string; paymentIntentId: string }>> {
     const token = localStorage.getItem('token');
-    console.log('📞 API: Creating payment intent for order:', orderId);
-    console.log('🔑 API: Token available:', !!token);
     
     const response = await fetch(`${this.baseURL}/payment/create-payment-intent/${orderId}`, {
       method: 'POST',
@@ -572,16 +635,12 @@ class ApiService {
       },
     });
     
-    console.log('📞 API: Payment intent response status:', response.status);
     const result = await handleResponse<{ clientSecret: string; paymentIntentId: string }>(response);
-    console.log('📞 API: Payment intent result:', result);
     return result;
   }
 
   async confirmPayment(paymentIntentId: string): Promise<ApiResponse<{ order: Order }>> {
     const token = localStorage.getItem('token');
-    console.log('✅ API: Confirming payment:', paymentIntentId);
-    console.log('🔑 API: Token available:', !!token);
     
     const response = await fetch(`${this.baseURL}/payment/confirm-payment`, {
       method: 'POST',
@@ -592,9 +651,7 @@ class ApiService {
       body: JSON.stringify({ paymentIntentId }),
     });
     
-    console.log('✅ API: Confirm payment response status:', response.status);
     const result = await handleResponse<{ order: Order }>(response);
-    console.log('✅ API: Confirm payment result:', result);
     return result;
   }
 
@@ -622,6 +679,182 @@ class ApiService {
       body: JSON.stringify({ reason }),
     });
     return handleResponse<{ order: Order; refundId: string }>(response);
+  }
+
+  // Payment Model API methods
+  async createPayment(paymentData: {
+    orderId: string;
+    amount: number;
+    paymentMethod: 'card' | 'cash';
+    stripePaymentId?: string;
+  }): Promise<ApiResponse<Payment>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(paymentData),
+    });
+    return handleResponse<Payment>(response);
+  }
+
+  async getPaymentById(paymentId: string): Promise<ApiResponse<Payment>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/payment/${paymentId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<Payment>(response);
+  }
+
+  async getUserPayments(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<ApiResponse<{ payments: Payment[]; totalPages: number; currentPage: number; total: number }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.status) queryParams.append('status', params.status);
+
+    const response = await fetch(`${this.baseURL}/payment/user/payments?${queryParams}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{ payments: Payment[]; totalPages: number; currentPage: number; total: number }>(response);
+  }
+
+  async updatePaymentStatus(paymentId: string, updateData: {
+    paymentStatus?: string;
+    stripeChargeId?: string;
+    refundId?: string;
+    refundReason?: string;
+  }): Promise<ApiResponse<Payment>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/payment/${paymentId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(updateData),
+    });
+    return handleResponse<Payment>(response);
+  }
+
+  // Location API methods
+  async updateLocation(locationData: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+    accuracy?: number;
+    altitude?: number;
+    speed?: number;
+    heading?: number;
+  }): Promise<ApiResponse<Location>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/location/update`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(locationData),
+    });
+    return handleResponse<Location>(response);
+  }
+
+  // Get delivery person's location history for trajectory tracking
+  async getDeliveryTrajectory(deliveryManId: string, orderId?: string): Promise<ApiResponse<Location[]>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const url = orderId 
+      ? `${this.baseURL}/location/trajectory/${deliveryManId}?orderId=${orderId}`
+      : `${this.baseURL}/location/trajectory/${deliveryManId}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    
+    return handleResponse<Location[]>(response);
+  }
+
+  async getUserLocations(params?: {
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+    isActive?: boolean;
+  }): Promise<ApiResponse<{ locations: Location[]; totalPages: number; currentPage: number; total: number }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+
+    const response = await fetch(`${this.baseURL}/location/history?${queryParams}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{ locations: Location[]; totalPages: number; currentPage: number; total: number }>(response);
+  }
+
+  async getCurrentLocation(userId: string): Promise<ApiResponse<{ user: { _id: string; name: string; currentLocation: any; latestLocation: Location } }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/location/current/${userId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{ user: { _id: string; name: string; currentLocation: any; latestLocation: Location } }>(response);
+  }
+
+  async getNearbyDeliveryMen(params: {
+    latitude: number;
+    longitude: number;
+    maxDistance?: number;
+  }): Promise<ApiResponse<{ deliveryMen: Array<Location & { user: User; distance: number }> }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const queryParams = new URLSearchParams();
+    queryParams.append('latitude', params.latitude.toString());
+    queryParams.append('longitude', params.longitude.toString());
+    if (params.maxDistance) queryParams.append('maxDistance', params.maxDistance.toString());
+
+    const response = await fetch(`${this.baseURL}/location/nearby-delivery?${queryParams}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{ deliveryMen: Array<Location & { user: User; distance: number }> }>(response);
   }
 }
 

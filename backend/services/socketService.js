@@ -34,8 +34,65 @@ class SocketService {
       });
 
 
+      // Handle delivery location updates
+      socket.on('location-update', (data) => {
+        console.log(`📍 Location update from delivery person:`, data);
+        // Broadcast location update to customer
+        if (data.orderId) {
+          // Get the order to find the user ID
+          const Orders = require('../models/orderModel');
+          Orders.findById(data.orderId)
+            .populate('user', '_id')
+            .then(order => {
+              if (order && order.user) {
+                socket.to(`user-${order.user._id}`).emit('location-update', {
+                  orderId: data.orderId,
+                  location: data.location,
+                  timestamp: data.timestamp
+                });
+                console.log(`📤 Location update sent to user ${order.user._id}`);
+              } else {
+                console.log('❌ Order or user not found for location update');
+              }
+            })
+            .catch(error => {
+              console.error('Error finding order for location update:', error);
+            });
+        }
+      });
+
+      // Handle delivery status updates
+      socket.on('delivery-update', (data) => {
+        console.log(`🚚 Delivery update:`, data);
+        // Broadcast delivery update to customer
+        if (data.orderId) {
+          // Get the order to find the user ID
+          const Orders = require('../models/orderModel');
+          Orders.findById(data.orderId)
+            .populate('user', '_id')
+            .then(order => {
+              if (order && order.user) {
+                socket.to(`user-${order.user._id}`).emit('delivery-update', {
+                  orderId: data.orderId,
+                  status: data.status,
+                  deliveryNotes: data.deliveryNotes,
+                  estimatedDeliveryTime: data.estimatedDeliveryTime,
+                  actualDeliveryTime: data.actualDeliveryTime,
+                  location: data.location
+                });
+                console.log(`📤 Delivery update sent to user ${order.user._id}`);
+              } else {
+                console.log('❌ Order or user not found for delivery update');
+              }
+            })
+            .catch(error => {
+              console.error('Error finding order for delivery update:', error);
+            });
+        }
+      });
+
       socket.on('disconnect', () => {
-        // User disconnected
+        console.log(`👋 User disconnected: ${socket.id}`);
       });
     });
 

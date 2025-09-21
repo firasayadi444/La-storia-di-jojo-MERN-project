@@ -13,10 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, CreditCard, CheckCircle, Shield, Lock, Sparkles } from 'lucide-react';
 
 // Log environment variable loading
-console.log('🔑 Environment check:');
-console.log('- VITE_STRIPE_PUBLISHABLE_KEY:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-console.log('- Key starts with pk_test:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.startsWith('pk_test'));
-console.log('- Key length:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.length);
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder_key');
 
@@ -42,11 +38,6 @@ const PaymentForm: React.FC<StripePaymentProps> = ({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    console.log('🚀 Payment process started');
-    console.log('- Stripe object:', !!stripe);
-    console.log('- Elements object:', !!elements);
-    console.log('- Order ID:', orderId);
-    console.log('- Total Amount:', totalAmount);
 
     if (!stripe || !elements) {
       console.error('❌ Stripe or Elements not available');
@@ -56,10 +47,8 @@ const PaymentForm: React.FC<StripePaymentProps> = ({
     setIsProcessing(true);
 
     try {
-      console.log('📞 Creating payment intent...');
       // Create payment intent
       const response = await apiService.createPaymentIntent(orderId);
-      console.log('📞 Payment intent response:', response);
       
       // Check if Stripe is not configured
       if (response.message && response.message.includes('Stripe is not configured')) {
@@ -69,9 +58,6 @@ const PaymentForm: React.FC<StripePaymentProps> = ({
       }
       
       const { clientSecret } = response;
-      console.log('🔐 Client secret received:', clientSecret ? 'Yes' : 'No');
-
-      console.log('💳 Confirming payment with Stripe...');
       // Confirm payment with Stripe
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
@@ -79,9 +65,6 @@ const PaymentForm: React.FC<StripePaymentProps> = ({
         }
       });
 
-      console.log('💳 Stripe confirmation result:');
-      console.log('- Error:', error);
-      console.log('- Payment Intent:', paymentIntent);
 
       if (error) {
         console.error('❌ Payment failed:', error);
@@ -92,10 +75,8 @@ const PaymentForm: React.FC<StripePaymentProps> = ({
           variant: "destructive"
         });
       } else if (paymentIntent.status === 'succeeded') {
-        console.log('✅ Payment succeeded, confirming on backend...');
         // Confirm payment on backend
         const confirmResponse = await apiService.confirmPayment(paymentIntent.id);
-        console.log('✅ Backend confirmation response:', confirmResponse);
         
         setIsSuccess(true);
         onPaymentSuccess(confirmResponse.order);
@@ -120,7 +101,6 @@ const PaymentForm: React.FC<StripePaymentProps> = ({
       });
     } finally {
       setIsProcessing(false);
-      console.log('🏁 Payment process completed');
     }
   };
 
@@ -245,6 +225,22 @@ const PaymentForm: React.FC<StripePaymentProps> = ({
 };
 
 const StripePayment: React.FC<StripePaymentProps> = (props) => {
+  // Check if we have a valid Stripe key
+  const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  
+  if (!stripeKey || stripeKey === 'pk_test_placeholder_key') {
+    return (
+      <div className="w-full max-w-lg mx-auto p-8 text-center">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Payment Not Available</h3>
+          <p className="text-yellow-700">
+            Stripe payment is not configured. Please contact support or use cash payment.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Elements stripe={stripePromise}>
       <PaymentForm {...props} />

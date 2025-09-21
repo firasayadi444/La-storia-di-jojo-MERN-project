@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bell, X, Check, Trash2, Clock, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,35 @@ const NotificationCenter: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [orderNotifications, setOrderNotifications] = useState<Order[]>([]);
+  const autoDismissTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Auto-dismiss notifications after 5 seconds when they become visible
+  useEffect(() => {
+    if (isOpen) {
+      // Set up auto-dismiss timers for all unread notifications
+      notifications.forEach(notification => {
+        if (!notification.read && !autoDismissTimers.current.has(notification.id)) {
+          const timer = setTimeout(() => {
+            removeNotification(notification.id);
+            autoDismissTimers.current.delete(notification.id);
+          }, 5000); // 5 seconds
+
+          autoDismissTimers.current.set(notification.id, timer);
+        }
+      });
+    } else {
+      // Clear all timers when notification center is closed
+      autoDismissTimers.current.forEach(timer => clearTimeout(timer));
+      autoDismissTimers.current.clear();
+    }
+  }, [isOpen, notifications, removeNotification]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      autoDismissTimers.current.forEach(timer => clearTimeout(timer));
+    };
+  }, []);
 
   // Fetch order notifications for users
   useEffect(() => {
@@ -71,12 +100,23 @@ const NotificationCenter: React.FC = () => {
   };
 
   const markAsRead = (id: string) => {
-    // In a real app, you'd update the notification in the backend
-    // For now, we'll just remove it from the local state
+    // Clear the auto-dismiss timer if it exists
+    const timer = autoDismissTimers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      autoDismissTimers.current.delete(id);
+    }
+    
+    // Remove the notification
     removeNotification(id);
   };
 
   const markAllAsRead = () => {
+    // Clear all auto-dismiss timers
+    autoDismissTimers.current.forEach(timer => clearTimeout(timer));
+    autoDismissTimers.current.clear();
+    
+    // Clear all notifications
     clearNotifications();
   };
 
@@ -149,9 +189,14 @@ const NotificationCenter: React.FC = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-gray-900 truncate">
-                              {notification.title}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-medium text-gray-900 truncate">
+                                {notification.title}
+                              </h4>
+                              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
+                                Auto-dismiss in 5s
+                              </span>
+                            </div>
                             <Button
                               variant="ghost"
                               size="sm"
