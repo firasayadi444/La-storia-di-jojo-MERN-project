@@ -45,7 +45,16 @@ const Checkout: React.FC = () => {
     return null;
   }
 
+  // Debug cart persistence
+  useEffect(() => {
+    console.log('🛒 Checkout - Cart items:', items);
+    console.log('🛒 Checkout - Cart length:', items.length);
+    console.log('🛒 Checkout - Auth status:', isAuthenticated);
+    console.log('🛒 Checkout - User role:', user?.role);
+  }, [items, isAuthenticated, user?.role]);
+
   if (items.length === 0) {
+    console.log('🛒 Checkout - Redirecting to cart (empty cart)');
     navigate('/cart');
     return null;
   }

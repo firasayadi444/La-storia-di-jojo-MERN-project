@@ -40,17 +40,43 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     const savedCart = localStorage.getItem('cart');
     if (savedCart) {
       try {
-        setItems(JSON.parse(savedCart));
+        const parsedCart = JSON.parse(savedCart);
+        console.log('🛒 Loading cart from localStorage:', parsedCart);
+        setItems(parsedCart);
       } catch (error) {
         console.error('Error loading cart from localStorage:', error);
         localStorage.removeItem('cart');
       }
+    } else {
+      console.log('🛒 No saved cart found in localStorage');
     }
   }, []);
 
-  // Clear cart when user is not authenticated or not a regular user
+  // Restore cart when user becomes authenticated
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'user') {
+    if (isAuthenticated && user?.role === 'user' && items.length === 0) {
+      const savedCart = localStorage.getItem('cart');
+      if (savedCart) {
+        try {
+          const parsedCart = JSON.parse(savedCart);
+          setItems(parsedCart);
+        } catch (error) {
+          console.error('Error restoring cart from localStorage:', error);
+          localStorage.removeItem('cart');
+        }
+      }
+    }
+  }, [isAuthenticated, user?.role, items.length]);
+
+  // Clear cart only when user is explicitly not authenticated or not a regular user
+  // Don't clear on initial load when authentication is still being checked
+  useEffect(() => {
+    // Only clear cart if we're sure the user is not authenticated or not a regular user
+    // and we're not in the initial loading state
+    if (isAuthenticated === false && user === null) {
+      setItems([]);
+      localStorage.removeItem('cart');
+    } else if (isAuthenticated === true && user?.role && user.role !== 'user') {
       setItems([]);
       localStorage.removeItem('cart');
     }
@@ -58,8 +84,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
   // Save cart to localStorage whenever items change
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'user') {
+    // Always save cart to localStorage, regardless of authentication status
+    // This ensures cart persists through page refreshes
+    if (items.length > 0) {
+      console.log('🛒 Saving cart to localStorage:', items);
       localStorage.setItem('cart', JSON.stringify(items));
+    } else if (items.length === 0 && isAuthenticated && user?.role === 'user') {
+      // Only clear localStorage when cart is empty and user is authenticated
+      console.log('🛒 Clearing cart from localStorage (empty cart)');
+      localStorage.removeItem('cart');
     }
   }, [items, isAuthenticated, user?.role]);
 
