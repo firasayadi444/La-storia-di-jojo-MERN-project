@@ -28,6 +28,25 @@ const orderController = {
         return res.status(400).json({ message: "Customer location is required for delivery tracking" });
       }
 
+      // Debug logging for customer location
+      console.log('Customer location received:', {
+        latitude: customerLocation.latitude,
+        longitude: customerLocation.longitude,
+        accuracy: customerLocation.accuracy,
+        type: typeof customerLocation.accuracy
+      });
+
+      // Validate and normalize accuracy
+      let normalizedAccuracy = 10; // Default accuracy
+      if (customerLocation.accuracy && typeof customerLocation.accuracy === 'number') {
+        // If accuracy is reasonable (between 1m and 1000m), use it
+        if (customerLocation.accuracy >= 1 && customerLocation.accuracy <= 1000) {
+          normalizedAccuracy = Math.round(customerLocation.accuracy);
+        } else {
+          console.warn('Unusual accuracy value received:', customerLocation.accuracy, 'using default 10m');
+        }
+      }
+
       // Get user from token (req.user is set by auth middleware)
       const userId = req.user._id;
 
@@ -48,7 +67,7 @@ const orderController = {
         customerLocation: {
           latitude: customerLocation.latitude,
           longitude: customerLocation.longitude,
-          accuracy: customerLocation.accuracy || 10,
+          accuracy: normalizedAccuracy,
           timestamp: new Date()
         },
         status: 'pending', // All orders start as pending, regardless of payment method

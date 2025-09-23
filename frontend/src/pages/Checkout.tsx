@@ -21,7 +21,7 @@ const Checkout: React.FC = () => {
     name: user?.name || '',
     email: user?.email || '',
     address: user?.address || '',
-    phone: '',
+    phone: user?.phone || '',
     notes: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +31,9 @@ const Checkout: React.FC = () => {
   const [customerLocation, setCustomerLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
-  const [showLocationConsent, setShowLocationConsent] = useState<boolean>(false);
+  const [manualLocation, setManualLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [showManualLocation, setShowManualLocation] = useState<boolean>(false);
+  const [locationRetryCount, setLocationRetryCount] = useState<number>(0);
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -50,29 +52,83 @@ const Checkout: React.FC = () => {
 
   const total = getTotalPrice();
 
-  // Show location consent dialog on component mount
+  // Automatically request location on component mount
   useEffect(() => {
-    setShowLocationConsent(true);
+    requestLocation();
+    
+    // Fallback: show manual location dialog after 10 seconds if no location is obtained
+    // Only show if phone number is provided (validation order: Phone → Location)
+    const fallbackTimer = setTimeout(() => {
+      if (locationPermission !== 'granted' && !getCurrentLocation() && orderData.phone?.trim()) {
+        setShowManualLocation(true);
+      }
+    }, 10000);
+    
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
-  const handleLocationConsent = (consent: boolean) => {
-    setShowLocationConsent(false);
-    
-    if (consent) {
-      requestLocation();
-    } else {
-      setLocationPermission('denied');
-      setLocationError('Location access is required for delivery tracking');
+  // Monitor location state changes
+  useEffect(() => {
+    if (hasLocation()) {
+      console.log('Location available:', getCurrentLocation());
+      // Force UI update by triggering a re-render
+      setLocationPermission('granted');
+      // Close manual location dialog if GPS location is captured
+      setShowManualLocation(false);
     }
-  };
+  }, [customerLocation, manualLocation]);
+
+  // Update phone number when user data changes
+  useEffect(() => {
+    if (user?.phone && !orderData.phone) {
+      setOrderData(prev => ({
+        ...prev,
+        phone: user.phone
+      }));
+    }
+  }, [user?.phone, orderData.phone]);
+
 
   const requestLocation = () => {
+    // Check if we're on a secure origin (HTTPS or localhost)
+    const isSecureOrigin = window.location.protocol === 'https:' || 
+                          window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1' ||
+                          window.location.hostname === '::1';
+    
+    // For development, allow localhost even on HTTP
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1' ||
+                       window.location.hostname === '::1';
+    
+    if (!isSecureOrigin && !isLocalhost) {
+      setLocationPermission('denied');
+      setLocationError('Location access requires HTTPS. Please use a secure connection or enter location manually.');
+      // Only show manual location dialog if phone number is provided
+      if (orderData.phone?.trim()) {
+        setShowManualLocation(true);
+      }
+      return;
+    }
+    
     if (navigator.geolocation) {
       setLocationPermission('pending');
-      navigator.geolocation.getCurrentPosition(
+      
+      try {
+        navigator.geolocation.getCurrentPosition(
         (position) => {
           const accuracy = position.coords.accuracy;
-          const isAccurateEnough = accuracy <= 100; // Within 100 meters
+          const isAccurateEnough = accuracy <= 500; // Within 500 meters (more flexible)
+          
+          // Debug logging
+          console.log('GPS Position received:', {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            altitude: position.coords.altitude,
+            speed: position.coords.speed,
+            heading: position.coords.heading
+          });
           
           setCustomerLocation({
             lat: position.coords.latitude,
@@ -81,12 +137,14 @@ const Checkout: React.FC = () => {
           });
           setLocationPermission('granted');
           setLocationError(null);
+          // Close manual location dialog if it's open
+          setShowManualLocation(false);
           
           if (!isAccurateEnough) {
             toast({
-              title: "Location Accuracy Warning",
-              description: `Location accuracy is ±${Math.round(accuracy)}m. This may affect delivery precision.`,
-              variant: "destructive"
+              title: "Location Captured",
+              description: `Location accuracy is ±${Math.round(accuracy)}m. This is acceptable for delivery.`,
+              variant: "default"
             });
           } else {
             toast({
@@ -110,44 +168,101 @@ const Checkout: React.FC = () => {
               errorMessage = 'Location request timed out. Please try again.';
               break;
             default:
-              errorMessage = 'An unknown error occurred while retrieving location.';
+              // Check for secure origin error
+              if (error.message && error.message.includes('secure origins')) {
+                errorMessage = 'Location access requires HTTPS. Please use a secure connection or enter location manually.';
+              } else {
+                errorMessage = 'An unknown error occurred while retrieving location.';
+              }
               break;
           }
           
           setLocationError(errorMessage);
-          console.error('Location error:', error);
-          toast({
-            title: "Location Required",
-            description: errorMessage,
-            variant: "destructive"
-          });
+          // Log error details for debugging (only in development)
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Location error:', {
+              code: error?.code || 'unknown',
+              message: error?.message || 'No message available',
+              timestamp: new Date().toISOString(),
+              userAgent: navigator.userAgent
+            });
+          }
+          
+          // Only show manual location dialog if location is actually missing
+          // Don't show it if phone number is missing
+          if (orderData.phone?.trim()) {
+            setShowManualLocation(true);
+          }
         },
         {
           enableHighAccuracy: true,
           timeout: 15000,
           maximumAge: 300000 // 5 minutes
         }
-      );
+        );
+      } catch (error) {
+        console.error('Geolocation API error:', error);
+        setLocationPermission('denied');
+        setLocationError('Geolocation API error occurred');
+        // Only show manual location dialog if phone number is provided
+        if (orderData.phone?.trim()) {
+          setShowManualLocation(true);
+        }
+      }
     } else {
       setLocationPermission('denied');
       setLocationError('Geolocation is not supported by this browser');
-      toast({
-        title: "Location Not Supported",
-        description: "Your browser doesn't support location services. Please use a modern browser.",
-        variant: "destructive"
-      });
+      // Only show manual location dialog if phone number is provided
+      if (orderData.phone?.trim()) {
+        setShowManualLocation(true);
+      }
     }
   };
 
   const retryLocation = () => {
+    // Check if we're on a secure origin (HTTPS or localhost)
+    const isSecureOrigin = window.location.protocol === 'https:' || 
+                          window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1' ||
+                          window.location.hostname === '::1';
+    
+    // For development, allow localhost even on HTTP
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1' ||
+                       window.location.hostname === '::1';
+    
+    if (!isSecureOrigin && !isLocalhost) {
+      setLocationPermission('denied');
+      setLocationError('Location access requires HTTPS. Please use a secure connection or enter location manually.');
+      // Only show manual location dialog if phone number is provided
+      if (orderData.phone?.trim()) {
+        setShowManualLocation(true);
+      }
+      return;
+    }
+    
+    // Prevent excessive retries
+    if (locationRetryCount >= 3) {
+      // Only show manual location dialog if phone number is provided
+      if (orderData.phone?.trim()) {
+        setShowManualLocation(true);
+      }
+      return;
+    }
+    
     if (navigator.geolocation) {
       setLocationPermission('pending');
       setLocationError(null);
+      setLocationRetryCount(prev => prev + 1);
       
-      navigator.geolocation.getCurrentPosition(
+      // Increase timeout for retries
+      const timeout = Math.min(15000 + (locationRetryCount * 5000), 30000);
+      
+      try {
+        navigator.geolocation.getCurrentPosition(
         (position) => {
           const accuracy = position.coords.accuracy;
-          const isAccurateEnough = accuracy <= 100;
+          const isAccurateEnough = accuracy <= 500; // More flexible accuracy requirement
           
           setCustomerLocation({
             lat: position.coords.latitude,
@@ -156,12 +271,15 @@ const Checkout: React.FC = () => {
           });
           setLocationPermission('granted');
           setLocationError(null);
+          setLocationRetryCount(0); // Reset retry count on success
+          // Close manual location dialog if it's open
+          setShowManualLocation(false);
           
           if (!isAccurateEnough) {
             toast({
-              title: "Location Accuracy Warning",
-              description: `Location accuracy is ±${Math.round(accuracy)}m. This may affect delivery precision.`,
-              variant: "destructive"
+              title: "Location Updated",
+              description: `Location refreshed (accuracy: ±${Math.round(accuracy)}m). This is acceptable for delivery.`,
+              variant: "default"
             });
           } else {
             toast({
@@ -182,34 +300,57 @@ const Checkout: React.FC = () => {
               errorMessage = 'Location information is unavailable. Please check your GPS.';
               break;
             case error.TIMEOUT:
-              errorMessage = 'Location request timed out. Please try again.';
+              errorMessage = `Location request timed out after ${timeout/1000}s. Please try again.`;
               break;
             default:
-              errorMessage = 'An unknown error occurred while retrieving location.';
+              // Check for secure origin error
+              if (error.message && error.message.includes('secure origins')) {
+                errorMessage = 'Location access requires HTTPS. Please use a secure connection or enter location manually.';
+              } else {
+                errorMessage = 'An unknown error occurred while retrieving location.';
+              }
               break;
           }
           
           setLocationError(errorMessage);
-          console.error('Location error:', error);
-          toast({
-            title: "Location Error",
-            description: errorMessage,
-            variant: "destructive"
-          });
+          // Log error details for debugging (only in development)
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Location retry error:', {
+              code: error?.code || 'unknown',
+              message: error?.message || 'No message available',
+              retryCount: locationRetryCount,
+              timeout: timeout,
+              timestamp: new Date().toISOString()
+            });
+          }
+          
+          // Only show manual location dialog if location is actually missing
+          // Don't show it if phone number is missing
+          if (orderData.phone?.trim()) {
+            setShowManualLocation(true);
+          }
         },
         {
           enableHighAccuracy: true,
-          timeout: 15000,
+          timeout: timeout,
           maximumAge: 0 // Force fresh location
         }
-      );
+        );
+      } catch (error) {
+        console.error('Geolocation retry API error:', error);
+        setLocationPermission('denied');
+        setLocationError('Geolocation API error occurred during retry');
+        // Only show manual location dialog if phone number is provided
+        if (orderData.phone?.trim()) {
+          setShowManualLocation(true);
+        }
+      }
     } else {
       setLocationError('Geolocation is not supported by this browser');
-      toast({
-        title: "Location Not Supported",
-        description: "Your browser doesn't support location services.",
-        variant: "destructive"
-      });
+      // Only show manual location dialog if phone number is provided
+      if (orderData.phone?.trim()) {
+        setShowManualLocation(true);
+      }
     }
   };
 
@@ -220,16 +361,80 @@ const Checkout: React.FC = () => {
     }));
   };
 
+  const handleManualLocationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.target as HTMLFormElement);
+    const lat = parseFloat(formData.get('lat') as string);
+    const lng = parseFloat(formData.get('lng') as string);
+    
+    if (isNaN(lat) || isNaN(lng)) {
+      toast({
+        title: "Invalid Coordinates",
+        description: "Please enter valid latitude and longitude values.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      toast({
+        title: "Invalid Coordinates",
+        description: "Latitude must be between -90 and 90, longitude between -180 and 180.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setManualLocation({ lat, lng });
+    setLocationPermission('granted');
+    setLocationError(null);
+    setShowManualLocation(false);
+    
+    toast({
+      title: "Location Set",
+      description: `Manual location set: ${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+    });
+  };
+
+  const getCurrentLocation = () => {
+    return customerLocation || manualLocation;
+  };
+
+  const hasLocation = () => {
+    const location = getCurrentLocation();
+    const hasValidLocation = location && 
+                           location.lat && 
+                           location.lng && 
+                           !isNaN(location.lat) && 
+                           !isNaN(location.lng);
+    console.log('hasLocation check:', { location, hasValidLocation });
+    return hasValidLocation;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if location is required
-    if (locationPermission !== 'granted' || !customerLocation) {
+    // Check if phone number is provided first
+    if (!orderData.phone || orderData.phone.trim() === '') {
       toast({
-        title: "Location Required",
-        description: "Please allow location access to place your order",
+        title: "Phone Number Required",
+        description: "Please enter your phone number to place your order",
         variant: "destructive"
       });
+      return;
+    }
+    
+    // Check if location is required (only after phone validation passes)
+    const currentLocation = getCurrentLocation();
+    console.log('Submit check:', { currentLocation, hasLocation: hasLocation() });
+    
+    if (!currentLocation || !currentLocation.lat || !currentLocation.lng) {
+      toast({
+        title: "Location Required",
+        description: "Please allow location access or enter your location manually to place your order",
+        variant: "destructive"
+      });
+      setShowManualLocation(true);
       return;
     }
 
@@ -247,11 +452,18 @@ const Checkout: React.FC = () => {
         deliveryAddress: orderData.address,
         paymentMethod,
         customerLocation: {
-          latitude: customerLocation.lat,
-          longitude: customerLocation.lng,
-          accuracy: customerLocation.accuracy
+          latitude: currentLocation.lat,
+          longitude: currentLocation.lng,
+          accuracy: customerLocation?.accuracy ? Math.round(customerLocation.accuracy) : 10 // Use GPS accuracy if available, otherwise default to 10m
         }
       };
+
+      // Debug logging
+      console.log('Order data being sent to backend:', {
+        customerLocation: orderDataForBackend.customerLocation,
+        originalAccuracy: customerLocation?.accuracy,
+        roundedAccuracy: customerLocation?.accuracy ? Math.round(customerLocation.accuracy) : 10
+      });
 
       // Call backend API to create order
       const response = await apiService.makeOrder(orderDataForBackend);
@@ -300,55 +512,6 @@ const Checkout: React.FC = () => {
 
   return (
     <>
-      {/* Location Consent Dialog */}
-      {showLocationConsent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="max-w-md mx-4 bg-white">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-orange-600">
-                <MapPin className="h-5 w-5" />
-                Location Access Required
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-gray-600">
-                To provide accurate delivery tracking, we need access to your current location. 
-                This helps our delivery team find you more easily.
-              </p>
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <h4 className="font-medium text-blue-900 mb-2">What we use your location for:</h4>
-                <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Accurate delivery tracking</li>
-                  <li>• Real-time delivery updates</li>
-                  <li>• Better delivery route planning</li>
-                  <li>• Improved delivery experience</li>
-                </ul>
-              </div>
-              <div className="bg-yellow-50 p-3 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <strong>Privacy:</strong> Your location is only used for this order and is not stored permanently.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => handleLocationConsent(true)}
-                  className="flex-1 bg-orange-600 hover:bg-orange-700"
-                >
-                  Allow Location Access
-                </Button>
-                <Button
-                  onClick={() => handleLocationConsent(false)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Continue Without Location
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
@@ -424,6 +587,11 @@ const Checkout: React.FC = () => {
                   <Label htmlFor="phone" className="flex items-center gap-2 text-sm font-semibold">
                     <Phone className="h-4 w-4" />
                     Phone Number
+                    {user?.phone && orderData.phone === user.phone && (
+                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                        Auto-filled from profile
+                      </span>
+                    )}
                   </Label>
                   <Input
                     id="phone"
@@ -435,17 +603,39 @@ const Checkout: React.FC = () => {
                     className="h-12 text-lg"
                     required
                   />
+                  {user?.phone && orderData.phone === user.phone && (
+                    <p className="text-xs text-gray-600">
+                      Phone number loaded from your profile. You can change it if needed.
+                    </p>
+                  )}
                 </div>
 
                 {/* Location Section */}
-                <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className={`space-y-4 p-4 rounded-lg border ${
+                  hasLocation() 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-blue-50 border-blue-200'
+                }`}>
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-blue-600" />
-                    <Label className="text-lg font-semibold text-blue-800">Location Access Required</Label>
+                    <MapPin className={`h-5 w-5 ${
+                      hasLocation() ? 'text-green-600' : 'text-blue-600'
+                    }`} />
+                    <Label className={`text-lg font-semibold ${
+                      hasLocation() ? 'text-green-800' : 'text-blue-800'
+                    }`}>
+                      {hasLocation() ? 'Location Captured' : 'Location Access Required'}
+                    </Label>
                   </div>
-                  <p className="text-sm text-blue-700">
-                    We need your location to provide accurate delivery tracking and estimated arrival times.
-                  </p>
+                  {!hasLocation() && (
+                    <p className="text-sm text-blue-700">
+                      We need your location to provide accurate delivery tracking and estimated arrival times.
+                      {window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && (
+                        <span className="block mt-1 text-orange-600 font-medium">
+                          Note: Location access requires HTTPS. If automatic detection fails, please enter coordinates manually.
+                        </span>
+                      )}
+                    </p>
+                  )}
                   
                   {locationPermission === 'pending' && (
                     <div className="flex items-center gap-2 text-blue-600">
@@ -454,62 +644,96 @@ const Checkout: React.FC = () => {
                     </div>
                   )}
                   
-                  {locationPermission === 'granted' && customerLocation && (
+                  {hasLocation() && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-green-600">
                         <CheckCircle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Location captured successfully</span>
+                        <span className="text-sm font-medium">
+                          {customerLocation ? 'GPS Location captured' : 'Manual location set'}
+                        </span>
                       </div>
                       <div className="bg-white p-3 rounded-lg border border-green-200">
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div>
                             <span className="text-gray-600">Coordinates:</span>
                             <div className="font-mono text-green-800">
-                              {customerLocation.lat.toFixed(6)}, {customerLocation.lng.toFixed(6)}
+                              {getCurrentLocation()!.lat.toFixed(6)}, {getCurrentLocation()!.lng.toFixed(6)}
                             </div>
                           </div>
-                          {customerLocation.accuracy && (
+                          <div>
+                            <span className="text-gray-600">Source:</span>
+                            <div className="font-medium text-blue-600">
+                              {customerLocation ? 'GPS' : 'Manual Entry'}
+                            </div>
+                          </div>
+                        </div>
+                        {customerLocation?.accuracy && (
+                          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                             <div>
                               <span className="text-gray-600">Accuracy:</span>
                               <div className={`font-medium ${
                                 customerLocation.accuracy <= 10 ? 'text-green-600' :
-                                customerLocation.accuracy <= 50 ? 'text-yellow-600' :
-                                'text-red-600'
+                                customerLocation.accuracy <= 100 ? 'text-yellow-600' :
+                                'text-blue-600'
                               }`}>
                                 ±{Math.round(customerLocation.accuracy)}m
-                                {customerLocation.accuracy > 100 && (
-                                  <span className="ml-1 text-xs">⚠️ Low accuracy</span>
+                                {customerLocation.accuracy > 500 && (
+                                  <span className="ml-1 text-xs">📍 Approximate location</span>
                                 )}
                               </div>
                             </div>
-                          )}
-                        </div>
-                        {customerLocation.accuracy && customerLocation.accuracy > 100 && (
-                          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                            ⚠️ Location accuracy is low. This may affect delivery precision. Consider moving to an open area for better GPS signal.
+                          </div>
+                        )}
+                        {customerLocation?.accuracy && customerLocation.accuracy > 500 && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                            📍 Location accuracy is approximate (±{Math.round(customerLocation.accuracy)}m). This is acceptable for delivery purposes.
+                          </div>
+                        )}
+                        {!customerLocation && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                            ℹ️ Using manually entered location. Make sure the coordinates are accurate for proper delivery.
                           </div>
                         )}
                       </div>
                     </div>
                   )}
                   
-                  {locationPermission === 'denied' && (
+                  {!hasLocation() && locationPermission === 'denied' && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-red-600">
                         <MapPin className="h-4 w-4" />
                         <span className="text-sm font-medium">Location access denied</span>
                       </div>
                       <p className="text-sm text-red-600">{locationError}</p>
-                      <Button
-                        type="button"
-                        onClick={retryLocation}
-                        variant="outline"
-                        size="sm"
-                        className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                      >
-                        <MapPin className="h-4 w-4 mr-2" />
-                        Try Again
-                      </Button>
+                      <div className="flex gap-2">
+                        {(() => {
+                          const isSecureOrigin = window.location.protocol === 'https:' || 
+                                                window.location.hostname === 'localhost' || 
+                                                window.location.hostname === '127.0.0.1';
+                          return isSecureOrigin ? (
+                            <Button
+                              type="button"
+                              onClick={retryLocation}
+                              variant="outline"
+                              size="sm"
+                              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                            >
+                              <MapPin className="h-4 w-4 mr-2" />
+                              Try Again
+                            </Button>
+                          ) : null;
+                        })()}
+                        <Button
+                          type="button"
+                          onClick={() => setShowManualLocation(true)}
+                          variant="outline"
+                          size="sm"
+                          className="text-green-600 border-green-600 hover:bg-green-50"
+                        >
+                          <User className="h-4 w-4 mr-2" />
+                          Enter Manually
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -575,7 +799,7 @@ const Checkout: React.FC = () => {
 
                 <Button
                   type="submit"
-                  disabled={isLoading || locationPermission !== 'granted' || !customerLocation}
+                  disabled={isLoading || !orderData.phone?.trim() || !getCurrentLocation() || !getCurrentLocation()?.lat || !getCurrentLocation()?.lng}
                   className="w-full btn-gradient text-white py-4 text-xl font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 mt-8 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isLoading ? (
@@ -583,7 +807,12 @@ const Checkout: React.FC = () => {
                       <Clock className="h-5 w-5 mr-2 animate-spin" />
                       Placing Order...
                     </>
-                  ) : locationPermission !== 'granted' || !customerLocation ? (
+                  ) : !orderData.phone?.trim() ? (
+                    <>
+                      <Phone className="h-5 w-5 mr-2" />
+                      Phone Required
+                    </>
+                  ) : !getCurrentLocation() || !getCurrentLocation()?.lat || !getCurrentLocation()?.lng ? (
                     <>
                       <MapPin className="h-5 w-5 mr-2" />
                       Location Required
@@ -725,6 +954,101 @@ const Checkout: React.FC = () => {
                     </Button>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Manual Location Input Dialog */}
+        {showManualLocation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <Card className="max-w-lg mx-4 bg-white">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-orange-600">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5" />
+                    Location Required for Delivery
+                  </div>
+                  <button
+                    onClick={() => setShowManualLocation(false)}
+                    className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+                  >
+                    ×
+                  </button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleManualLocationSubmit} className="space-y-4">
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Automatic location detection failed.</strong> This may be due to HTTPS requirements or GPS issues. Please enter your coordinates manually for accurate delivery.
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="lat" className="text-sm font-semibold">
+                        Latitude
+                      </Label>
+                      <Input
+                        id="lat"
+                        name="lat"
+                        type="number"
+                        step="any"
+                        placeholder="e.g., 40.7128"
+                        required
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lng" className="text-sm font-semibold">
+                        Longitude
+                      </Label>
+                      <Input
+                        id="lng"
+                        name="lng"
+                        type="number"
+                        step="any"
+                        placeholder="e.g., -74.0060"
+                        required
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-50 p-3 rounded-lg">
+                    <h4 className="font-medium text-green-900 mb-2">Quick way to get coordinates:</h4>
+                    <p className="text-sm text-green-800">
+                      Open Google Maps → Right-click on your location → Click the coordinates that appear
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <Button
+                      type="submit"
+                      className="flex-1 bg-orange-600 hover:bg-orange-700"
+                    >
+                      Continue with Location
+                    </Button>
+                    {(() => {
+                      const isSecureOrigin = window.location.protocol === 'https:' || 
+                                            window.location.hostname === 'localhost' || 
+                                            window.location.hostname === '127.0.0.1';
+                      return (
+                        <Button
+                          type="button"
+                          onClick={retryLocation}
+                          variant="outline"
+                          className="flex-1"
+                          disabled={!isSecureOrigin}
+                          title={!isSecureOrigin ? "GPS requires HTTPS connection" : ""}
+                        >
+                          Try GPS Again
+                        </Button>
+                      );
+                    })()}
+                  </div>
+                </form>
               </CardContent>
             </Card>
           </div>

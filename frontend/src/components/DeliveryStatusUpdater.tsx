@@ -388,7 +388,12 @@ const DeliveryStatusUpdater: React.FC<DeliveryStatusUpdaterProps> = ({
                   {order.customerLocation.accuracy && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Accuracy:</span>
-                      <span className="text-blue-800">±{Math.round(order.customerLocation.accuracy)}m</span>
+                      <span className={`text-blue-800 ${
+                        order.customerLocation.accuracy > 1000 ? 'text-red-600 font-semibold' : ''
+                      }`}>
+                        ±{Math.round(order.customerLocation.accuracy)}m
+                        {order.customerLocation.accuracy > 1000 && ' (Low accuracy)'}
+                      </span>
                     </div>
                   )}
                   {order.customerLocation.timestamp && (
@@ -491,7 +496,12 @@ const DeliveryStatusUpdater: React.FC<DeliveryStatusUpdaterProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Accuracy:</span>
-                <span className="text-gray-800">±{order.customerLocation.accuracy || 10}m</span>
+                <span className={`text-gray-800 ${
+                  order.customerLocation.accuracy > 1000 ? 'text-red-600 font-semibold' : ''
+                }`}>
+                  ±{Math.round(order.customerLocation.accuracy || 10)}m
+                  {order.customerLocation.accuracy > 1000 && ' (Low accuracy)'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Captured:</span>

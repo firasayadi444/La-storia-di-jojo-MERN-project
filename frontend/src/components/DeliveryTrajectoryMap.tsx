@@ -388,11 +388,14 @@ const DeliveryTrajectoryMap: React.FC<DeliveryTrajectoryMapProps> = ({
                         'Location not available'
                       }
                     </p>
-                    {customerLocation?.accuracy && (
-                      <p className="text-xs text-gray-500">
-                        Accuracy: ±{Math.round(customerLocation.accuracy)}m
-                      </p>
-                    )}
+                     {customerLocation?.accuracy && (
+                       <p className={`text-xs ${
+                         customerLocation.accuracy > 1000 ? 'text-red-500 font-semibold' : 'text-gray-500'
+                       }`}>
+                         Accuracy: ±{Math.round(customerLocation.accuracy)}m
+                         {customerLocation.accuracy > 1000 && ' (Low accuracy)'}
+                       </p>
+                     )}
                     {customerLocation?.timestamp && (
                       <p className="text-xs text-gray-500">
                         Captured: {new Date(customerLocation.timestamp).toLocaleString()}
