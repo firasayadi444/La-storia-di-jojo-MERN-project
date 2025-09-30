@@ -34,4 +34,7 @@ router.get('/admin/ordershistory', adminAuthMiddleware, orderController.getDeliv
 
 router.get('/user-notifications', authMiddleware, orderController.getUserNotifications);
 
+// Order tracking route
+router.get('/orders/:orderId/tracking', authMiddleware, orderController.getOrderTracking);
+
 module.exports = router;

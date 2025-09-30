@@ -42,26 +42,17 @@ const UserOrdersHistory: React.FC = () => {
 
     try {
       await apiService.submitFeedback(selectedOrder._id, feedbackData);
-      
-      toast({
-        title: "Feedback Submitted!",
-        description: "Thank you for your feedback. It helps us improve our service!",
-      });
-
+      toast({ title: 'Feedback submitted successfully!' });
       setFeedbackDialog(false);
       setFeedbackData({ deliveryRating: 5, foodRating: 5, feedbackComment: '' });
-      fetchOrders(); // Refresh orders to show updated feedback
+      fetchOrders();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit feedback",
-        variant: "destructive"
-      });
+      toast({ title: 'Error', description: error.message || 'Failed to submit feedback', variant: 'destructive' });
     }
   };
 
   const canSubmitFeedback = (order: Order) => {
-    return order.status === 'delivered' && !order.feedbackComment && !order.deliveryRating;
+    return order.status === 'delivered' && !order.deliveryRating && !order.foodRating;
   };
 
   const getStatusColor = (status: string) => {
@@ -134,8 +125,16 @@ const UserOrdersHistory: React.FC = () => {
               ) : null;
               return (
                 <div className="relative">
-                  <div className="absolute left-0 top-0 h-full w-1 rounded-l-lg bg-gradient-to-b from-italian-green-400 to-italian-green-600" />
-                  <Card key={order._id} className="shadow-xl border-0 bg-white rounded-xl pl-4 md:pl-6 relative overflow-hidden">
+                  <div className={`absolute left-0 top-0 h-full w-1 rounded-l-lg ${
+                    order.status === 'delivered' ? 'bg-gradient-to-b from-green-400 to-green-600' : 
+                    order.status === 'cancelled' ? 'bg-gradient-to-b from-red-400 to-red-600' : 
+                    'bg-gradient-to-b from-gray-400 to-gray-600'
+                  }`} />
+                  <Card key={order._id} className={`shadow-xl border-0 rounded-xl pl-4 md:pl-6 relative overflow-hidden ${
+                    order.status === 'delivered' ? 'bg-gradient-to-br from-green-50 to-green-100' : 
+                    order.status === 'cancelled' ? 'bg-gradient-to-br from-red-50 to-red-100' : 
+                    'bg-gradient-to-br from-gray-50 to-gray-100'
+                  }`}>
                     <CardHeader className="pb-4">
                       <div className="flex justify-between items-start">
                         <div>
@@ -161,7 +160,11 @@ const UserOrdersHistory: React.FC = () => {
                         {deliveryAvatar}
                       </div>
                       {/* Order Items */}
-                      <div className="mb-4 bg-gray-50 rounded-lg p-3">
+                      <div className={`mb-4 rounded-lg p-3 ${
+                        order.status === 'delivered' ? 'bg-green-50' : 
+                        order.status === 'cancelled' ? 'bg-red-50' : 
+                        'bg-gray-50'
+                      }`}>
                         <h4 className="font-semibold text-gray-700 mb-2">Items</h4>
                         <div className="space-y-2">
                           {order.items.map((item, index) => {
@@ -219,7 +222,11 @@ const UserOrdersHistory: React.FC = () => {
                       </div>
                       {/* Delivery Man Info */}
                       {order.deliveryMan && (
-                        <div className="mb-4 flex items-center gap-3 bg-italian-cream-100 rounded-lg p-3">
+                        <div className={`mb-4 flex items-center gap-3 rounded-lg p-3 ${
+                          order.status === 'delivered' ? 'bg-green-200' : 
+                          order.status === 'cancelled' ? 'bg-red-200' : 
+                          'bg-gray-200'
+                        }`}>
                           {deliveryAvatar}
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Delivery Person</p>
@@ -300,22 +307,36 @@ const UserOrdersHistory: React.FC = () => {
                           </h4>
                           <div className="space-y-2">
                             {order.deliveryRating && (
-                              <p className="text-sm">
-                                <span className="text-gray-600">Delivery Rating:</span>
-                                <span className="ml-2 text-yellow-500">{'⭐'.repeat(order.deliveryRating)}</span>
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">Delivery Rating:</span>
+                                <div className="flex">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`h-4 w-4 ${i < order.deliveryRating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
                             )}
                             {order.foodRating && (
-                              <p className="text-sm">
-                                <span className="text-gray-600">Food Rating:</span>
-                                <span className="ml-2 text-yellow-500">{'⭐'.repeat(order.foodRating)}</span>
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">Food Rating:</span>
+                                <div className="flex">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`h-4 w-4 ${i < order.foodRating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
                             )}
                             {order.feedbackComment && (
-                              <p className="text-sm">
-                                <span className="text-gray-600">Comment:</span>
-                                <span className="ml-2 italic text-gray-700">"{order.feedbackComment}"</span>
-                              </p>
+                              <div>
+                                <span className="text-sm text-gray-600">Comment:</span>
+                                <p className="text-sm text-gray-800 mt-1">{order.feedbackComment}</p>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -328,63 +349,46 @@ const UserOrdersHistory: React.FC = () => {
           </div>
         )}
       </div>
+
       {/* Feedback Dialog */}
       <Dialog open={feedbackDialog} onOpenChange={setFeedbackDialog}>
-        <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl shadow-2xl border-0">
-          {/* Colorful Header */}
-          <div className="bg-gradient-to-r from-green-400 via-emerald-400 to-italian-green-600 px-6 py-4 flex items-center gap-3">
-            <Star className="h-7 w-7 text-yellow-300 drop-shadow-lg animate-bounce" />
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leave Feedback</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
             <div>
-              <h2 className="text-lg font-bold text-white">We Value Your Feedback!</h2>
-              <p className="text-white text-xs opacity-80">Help us improve your experience</p>
-            </div>
-          </div>
-          <div className="space-y-5 p-6">
-            {/* Delivery Rating */}
-            <div>
-              <Label htmlFor="deliveryRating" className="font-semibold text-italian-green-800">Delivery Rating</Label>
-              <div className="flex items-center space-x-2 mt-2">
-                {[1, 2, 3, 4, 5].map((star) => (
+              <Label htmlFor="deliveryRating">Delivery Rating</Label>
+              <div className="flex gap-1 mt-1">
+                {[1, 2, 3, 4, 5].map((rating) => (
                   <button
-                    key={star}
+                    key={rating}
                     type="button"
-                    aria-label={`Rate delivery ${star} star${star > 1 ? 's' : ''}`}
-                    onClick={() => setFeedbackData(prev => ({ ...prev, deliveryRating: star }))}
-                    className={`text-3xl transition-transform duration-150 focus:outline-none ${feedbackData.deliveryRating >= star ? 'text-yellow-400' : 'text-gray-400'} hover:scale-125`}
+                    onClick={() => setFeedbackData(prev => ({ ...prev, deliveryRating: rating }))}
+                    className={`p-1 ${feedbackData.deliveryRating >= rating ? 'text-yellow-400' : 'text-gray-300'}`}
                   >
-                    <span className="select-none">★</span>
+                    <Star className="h-6 w-6 fill-current" />
                   </button>
                 ))}
               </div>
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>Poor</span>
-                <span>Excellent</span>
-              </div>
             </div>
-            {/* Food Rating */}
             <div>
-              <Label htmlFor="foodRating" className="font-semibold text-italian-green-800">Food Rating</Label>
-              <div className="flex items-center space-x-2 mt-2">
-                {[1, 2, 3, 4, 5].map((star) => (
+              <Label htmlFor="foodRating">Food Rating</Label>
+              <div className="flex gap-1 mt-1">
+                {[1, 2, 3, 4, 5].map((rating) => (
                   <button
-                    key={star}
+                    key={rating}
                     type="button"
-                    aria-label={`Rate food ${star} star${star > 1 ? 's' : ''}`}
-                    onClick={() => setFeedbackData(prev => ({ ...prev, foodRating: star }))}
-                    className={`text-3xl transition-transform duration-150 focus:outline-none ${feedbackData.foodRating >= star ? 'text-yellow-400' : 'text-gray-400'} hover:scale-125`}
+                    onClick={() => setFeedbackData(prev => ({ ...prev, foodRating: rating }))}
+                    className={`p-1 ${feedbackData.foodRating >= rating ? 'text-yellow-400' : 'text-gray-300'}`}
                   >
-                    <span className="select-none">★</span>
+                    <Star className="h-6 w-6 fill-current" />
                   </button>
                 ))}
               </div>
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>Poor</span>
-                <span>Excellent</span>
-              </div>
             </div>
-            {/* Feedback Comment */}
             <div>
-              <Label htmlFor="feedbackComment" className="font-semibold text-italian-green-800">Additional Comments</Label>
+              <Label htmlFor="feedbackComment">Comments (Optional)</Label>
               <Textarea
                 id="feedbackComment"
                 value={feedbackData.feedbackComment}
@@ -394,10 +398,10 @@ const UserOrdersHistory: React.FC = () => {
                   }
                 }}
                 placeholder="Share your experience, suggestions, or anything else..."
+                className="mt-1"
                 rows={3}
-                className="mt-1 border-italian-cream-200 focus:ring-italian-green-400"
               />
-              <div className="text-xs text-gray-400 text-right mt-1">{feedbackData.feedbackComment.length}/250</div>
+              <p className="text-xs text-gray-500 mt-1">{feedbackData.feedbackComment.length}/250 characters</p>
             </div>
             {/* Action Buttons */}
             <div className="flex justify-end space-x-2 pt-2">
@@ -415,4 +419,4 @@ const UserOrdersHistory: React.FC = () => {
   );
 };
 
-export default UserOrdersHistory; 
+export default UserOrdersHistory;

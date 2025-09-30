@@ -1,73 +1,154 @@
-# Welcome to your Lovable project
+# OrderApp - Food Delivery Platform
 
-## Project info
+A modern, full-stack food delivery application built with React, Node.js, and MongoDB.
 
-**URL**: https://lovable.dev/projects/686c70c6-8e9b-4b66-ad1f-aa3caf46fab7
+## Features
 
-## How can I edit this code?
+- 🍕 **Food Management**: Browse and manage food items with categories
+- 🛒 **Shopping Cart**: Add items to cart with quantity management
+- 💳 **Payment Processing**: Secure payment with Stripe integration
+- 📱 **Real-time Tracking**: Live delivery tracking with Socket.io
+- 👥 **User Management**: Customer, admin, and delivery person roles
+- 📊 **Analytics Dashboard**: Comprehensive order and delivery analytics
+- 🗺️ **Location Services**: GPS-based delivery tracking
+- ⭐ **Rating System**: Customer feedback and rating system
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** for styling
+- **shadcn/ui** for UI components
+- **React Router** for navigation
+- **Socket.io Client** for real-time features
+- **Leaflet** for maps and location services
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/686c70c6-8e9b-4b66-ad1f-aa3caf46fab7) and start prompting.
+### Backend
+- **Node.js** with Express
+- **MongoDB** with Mongoose
+- **Socket.io** for real-time communication
+- **JWT** for authentication
+- **Stripe** for payment processing
+- **bcryptjs** for password hashing
 
-Changes made via Lovable will be committed automatically to this repo.
+## Getting Started
 
-**Use your preferred IDE**
+### Prerequisites
+- Node.js (v16 or higher)
+- MongoDB
+- npm or yarn
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd OrderApp
+   ```
 
-Follow these steps:
+2. **Install dependencies**
+   ```bash
+   # Install backend dependencies
+   cd backend
+   npm install
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+   # Install frontend dependencies
+   cd ../frontend
+   npm install
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+3. **Environment Setup**
+   ```bash
+   # Backend environment variables
+   cd backend
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+4. **Start the application**
+   ```bash
+   # Start backend server
+   cd backend
+   npm run dev
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+   # Start frontend development server
+   cd frontend
+   npm run dev
+   ```
+
+## Project Structure
+
+```
+OrderApp/
+├── backend/                 # Node.js backend
+│   ├── controllers/         # Route controllers
+│   ├── models/             # MongoDB models
+│   ├── routes/             # API routes
+│   ├── services/           # Business logic
+│   ├── middlewares/        # Custom middlewares
+│   └── utils/              # Utility functions
+├── frontend/               # React frontend
+│   ├── src/
+│   │   ├── components/     # Reusable components
+│   │   ├── pages/          # Page components
+│   │   ├── contexts/       # React contexts
+│   │   ├── services/       # API services
+│   │   └── utils/          # Utility functions
+│   └── public/             # Static assets
+└── k8s-manifestes/         # Kubernetes deployment files
 ```
 
-**Edit a file directly in GitHub**
+## API Endpoints
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `POST /api/auth/change-password` - Change password
 
-**Use GitHub Codespaces**
+### Food Management
+- `GET /api/foods` - Get all foods
+- `POST /api/foods` - Create food (Admin)
+- `PUT /api/foods/:id` - Update food (Admin)
+- `DELETE /api/foods/:id` - Delete food (Admin)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Orders
+- `GET /api/orders` - Get user orders
+- `POST /api/orders` - Create order
+- `PUT /api/orders/:id` - Update order status
+- `GET /api/orders/history` - Get order history
 
-## What technologies are used for this project?
+### Users
+- `GET /api/users` - Get all users (Admin)
+- `PUT /api/users/:id` - Update user
+- `DELETE /api/users/:id` - Delete user (Admin)
 
-This project is built with:
+## Deployment
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Docker
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
+```
 
-## How can I deploy this project?
+### Kubernetes
+```bash
+# Apply Kubernetes manifests
+kubectl apply -f k8s-manifestes/
+```
 
-Simply open [Lovable](https://lovable.dev/projects/686c70c6-8e9b-4b66-ad1f-aa3caf46fab7) and click on Share -> Publish.
+## Contributing
 
-## Can I connect a custom domain to my Lovable project?
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Yes, you can!
+## License
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## Support
+
+For support, email support@orderapp.com or create an issue in the repository.

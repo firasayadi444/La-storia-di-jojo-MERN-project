@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const socketService = require('../services/socketService');
+const { calculateDistance, calculateRealTimeETA, formatTimeEstimate } = require('../utils/distanceCalculator');
 
 const deliverymanController = {
   // Submit new deliveryman application
@@ -263,6 +264,271 @@ const deliverymanController = {
       res.status(500).json({ message: error.message });
     }
   },
+
+  // Update delivery person location
+  updateLocation: async (req, res) => {
+    try {
+      const { latitude, longitude, accuracy, speed, heading } = req.body;
+      const deliveryManId = req.user._id;
+
+      // Validate location data
+      if (!latitude || !longitude) {
+        return res.status(400).json({ message: 'Latitude and longitude are required' });
+      }
+
+      if (latitude < -90 || latitude > 90) {
+        return res.status(400).json({ message: 'Invalid latitude. Must be between -90 and 90' });
+      }
+
+      if (longitude < -180 || longitude > 180) {
+        return res.status(400).json({ message: 'Invalid longitude. Must be between -180 and 180' });
+      }
+
+      // Update delivery person's current location
+      const user = await Users.findByIdAndUpdate(
+        deliveryManId,
+        {
+          $set: {
+            'currentLocation.coordinates': [longitude, latitude], // GeoJSON format: [lng, lat]
+            'currentLocation.accuracy': accuracy || 10,
+            'currentLocation.speed': speed || 0,
+            'currentLocation.heading': heading || 0,
+            'currentLocation.lastUpdated': new Date()
+          }
+        },
+        { new: true }
+      );
+
+      if (!user) {
+        return res.status(404).json({ message: 'Delivery person not found' });
+      }
+
+      // Get all active orders for this delivery person
+      const activeOrders = await Orders.find({
+        deliveryMan: deliveryManId,
+        status: { $in: ['out_for_delivery', 'ready'] }
+      }).populate('user', '_id name email phone');
+
+      // Broadcast location update to customers
+      const io = socketService.getIO();
+      if (io) {
+        activeOrders.forEach(order => {
+          // Emit location update to customer
+          io.to(`user-${order.user._id}`).emit('delivery-location-update', {
+            orderId: order._id,
+            location: {
+              latitude: latitude,
+              longitude: longitude,
+              accuracy: accuracy || 10,
+              speed: speed || 0,
+              heading: heading || 0
+            },
+            timestamp: new Date().toISOString()
+          });
+
+          // Calculate and broadcast ETA update
+          const etaUpdate = calculateRealTimeETA(order, user, order.status);
+          if (etaUpdate) {
+            const formattedETA = formatTimeEstimate(etaUpdate);
+            io.to(`user-${order.user._id}`).emit('eta-update', {
+              orderId: order._id,
+              estimatedDeliveryTime: etaUpdate.estimatedDeliveryTime,
+              remainingMinutes: formattedETA.remainingMinutes,
+              distance: etaUpdate.distanceKm,
+              formattedTime: formattedETA.formattedTime
+            });
+          }
+        });
+      }
+
+      res.json({
+        message: 'Location updated successfully',
+        location: {
+          latitude,
+          longitude,
+          accuracy: accuracy || 10,
+          speed: speed || 0,
+          heading: heading || 0,
+          lastUpdated: new Date()
+        },
+        activeOrdersCount: activeOrders.length
+      });
+
+    } catch (error) {
+      console.error('Location update error:', error);
+      res.status(500).json({ message: 'Failed to update location' });
+    }
+  },
+
+  // Get order tracking data
+  getOrderTracking: async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const deliveryManId = req.user._id;
+
+      // Find the order and verify delivery person has access
+      const order = await Orders.findOne({
+        _id: orderId,
+        deliveryMan: deliveryManId
+      }).populate('user', '_id name email phone');
+
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found or you are not assigned to this order' });
+      }
+
+      // Get delivery person's current location
+      const deliveryPerson = await Users.findById(deliveryManId, 'currentLocation name phone vehicleType');
+
+      // Calculate current distance and ETA
+      let trackingData = {
+        order: {
+          _id: order._id,
+          status: order.status,
+          customerLocation: order.customerLocation,
+          deliveryAddress: order.deliveryAddress,
+          estimatedDeliveryTime: order.estimatedDeliveryTime,
+          createdAt: order.createdAt
+        },
+        customer: order.user,
+        deliveryPerson: {
+          _id: deliveryPerson._id,
+          name: deliveryPerson.name,
+          phone: deliveryPerson.phone,
+          vehicleType: deliveryPerson.vehicleType,
+          currentLocation: deliveryPerson.currentLocation
+        }
+      };
+
+      // Calculate distance and ETA if both locations are available
+      if (order.customerLocation && deliveryPerson.currentLocation && deliveryPerson.currentLocation.coordinates) {
+        const [deliveryLng, deliveryLat] = deliveryPerson.currentLocation.coordinates;
+        const distance = calculateDistance(
+          order.customerLocation.latitude,
+          order.customerLocation.longitude,
+          deliveryLat,
+          deliveryLng
+        );
+
+        const etaUpdate = calculateRealTimeETA(order, deliveryPerson, order.status);
+        const formattedETA = formatTimeEstimate(etaUpdate);
+
+        trackingData.distance = {
+          meters: Math.round(distance),
+          kilometers: Math.round(distance / 1000 * 100) / 100
+        };
+
+        trackingData.eta = formattedETA;
+      }
+
+      res.json(trackingData);
+
+    } catch (error) {
+      console.error('Get order tracking error:', error);
+      res.status(500).json({ message: 'Failed to get order tracking data' });
+    }
+  },
+
+  // Update delivery status
+  updateDeliveryStatus: async (req, res) => {
+    try {
+      const { orderId, status, notes, location } = req.body;
+      const deliveryManId = req.user._id;
+
+      // Validate status
+      const validStatuses = ['picked_up', 'in_transit', 'delivered', 'failed'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: 'Invalid status. Must be one of: ' + validStatuses.join(', ') });
+      }
+
+      // Find the order and verify delivery person has access
+      const order = await Orders.findOne({
+        _id: orderId,
+        deliveryMan: deliveryManId
+      }).populate('user', '_id name email phone');
+
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found or you are not assigned to this order' });
+      }
+
+      // Update order status based on delivery status
+      let orderStatus = order.status;
+      let actualDeliveryTime = order.actualDeliveryTime;
+
+      switch (status) {
+        case 'picked_up':
+          orderStatus = 'out_for_delivery';
+          break;
+        case 'in_transit':
+          orderStatus = 'out_for_delivery';
+          break;
+        case 'delivered':
+          orderStatus = 'delivered';
+          actualDeliveryTime = new Date();
+          break;
+        case 'failed':
+          orderStatus = 'cancelled';
+          break;
+      }
+
+      // Update order
+      const updatedOrder = await Orders.findByIdAndUpdate(
+        orderId,
+        {
+          status: orderStatus,
+          actualDeliveryTime: actualDeliveryTime,
+          deliveryNotes: notes || order.deliveryNotes
+        },
+        { new: true }
+      ).populate('user', '_id name email phone')
+       .populate('deliveryMan', '_id name phone vehicleType currentLocation');
+
+      // Update delivery person's location if provided
+      if (location && location.latitude && location.longitude) {
+        await Users.findByIdAndUpdate(deliveryManId, {
+          $set: {
+            'currentLocation.coordinates': [location.longitude, location.latitude],
+            'currentLocation.accuracy': location.accuracy || 10,
+            'currentLocation.lastUpdated': new Date()
+          }
+        });
+      }
+
+      // Broadcast status update to customer
+      const io = socketService.getIO();
+      if (io) {
+        io.to(`user-${order.user._id}`).emit('order-updated', {
+          order: updatedOrder
+        });
+
+        io.to(`user-${order.user._id}`).emit('delivery-update', {
+          orderId: orderId,
+          status: orderStatus,
+          deliveryNotes: notes,
+          actualDeliveryTime: actualDeliveryTime,
+          location: location
+        });
+
+        // Notify admins
+        io.to('admin').emit('delivery-status-update', {
+          orderId: orderId,
+          status: orderStatus,
+          deliveryMan: deliveryManId,
+          customer: order.user._id,
+          timestamp: new Date()
+        });
+      }
+
+      res.json({
+        message: 'Delivery status updated successfully',
+        order: updatedOrder,
+        deliveryStatus: status
+      });
+
+    } catch (error) {
+      console.error('Update delivery status error:', error);
+      res.status(500).json({ message: 'Failed to update delivery status' });
+    }
+  }
 };
 
 module.exports = deliverymanController;

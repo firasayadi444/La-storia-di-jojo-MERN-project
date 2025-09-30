@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useAvailability } from '../contexts/AvailabilityContext';
-import { apiService, Order } from '../services/api';
+import { apiService } from '../services/api';
+import type { Order } from '../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +32,7 @@ import {
   Banknote,
   RefreshCw
 } from 'lucide-react';
+import DeliveryTracking from '../components/DeliveryTracking';
 
 const DeliveryDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -608,38 +610,18 @@ const DeliveryDashboard: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delivery Tracking Dialog - Simplified */}
-      <Dialog open={!!selectedOrderForTracking} onOpenChange={() => setSelectedOrderForTracking(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Delivery Tracking</DialogTitle>
-          </DialogHeader>
-          {selectedOrderForTracking && (
-            <div className="space-y-4">
-              <div className="text-center py-8">
-                <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Order #{selectedOrderForTracking._id.slice(-6)}
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Delivery tracking feature is temporarily unavailable.
-                </p>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    <strong>Customer:</strong> {selectedOrderForTracking.user?.name}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    <strong>Address:</strong> {selectedOrderForTracking.deliveryAddress}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    <strong>Status:</strong> {selectedOrderForTracking.status.replace('_', ' ')}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Delivery Tracking Dialog */}
+      {selectedOrderForTracking && (
+        <DeliveryTracking
+          isOpen={!!selectedOrderForTracking}
+          onClose={() => setSelectedOrderForTracking(null)}
+          order={selectedOrderForTracking}
+          deliveryManLocation={user?.currentLocation?.coordinates ? {
+            latitude: user.currentLocation.coordinates[1],
+            longitude: user.currentLocation.coordinates[0]
+          } : undefined}
+        />
+      )}
     </div>
   );
 };

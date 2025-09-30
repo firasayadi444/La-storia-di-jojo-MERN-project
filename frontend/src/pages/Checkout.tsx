@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import StripePayment from '@/components/StripePayment';
-import { CheckCircle, CreditCard, Banknote, ArrowLeft, Shield, Clock, MapPin, User, Phone, Mail, Sparkles } from 'lucide-react';
+import LocationPicker from '@/components/LocationPicker';
+import { CheckCircle, CreditCard, Banknote, ArrowLeft, Shield, Clock, MapPin, User, Phone, Mail, Sparkles, Navigation } from 'lucide-react';
 
 const Checkout: React.FC = () => {
   const { items, getTotalPrice, clearCart } = useCart();
@@ -28,6 +29,13 @@ const Checkout: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
   const [orderId, setOrderId] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    address: string;
+    accuracy: number;
+  } | null>(null);
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -114,7 +122,11 @@ const Checkout: React.FC = () => {
         status: paymentMethod === 'card' ? 'pending_payment' : 'pending',
         deliveryNotes: orderData.notes,
         estimatedDeliveryTime: deliveryTime.toISOString(),
-        customerLocation: {
+        customerLocation: selectedLocation ? {
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          accuracy: selectedLocation.accuracy
+        } : {
           latitude: 36.8065, // Default Tunis coordinates
           longitude: 10.1815,
           accuracy: 100
@@ -318,15 +330,42 @@ const Checkout: React.FC = () => {
                       <MapPin className="h-4 w-4" />
                       Delivery Address *
                     </Label>
-                    <Input
-                      id="address"
-                      name="address"
-                      value={orderData.address}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full"
-                      placeholder="Enter your delivery address"
-                    />
+                    <div className="space-y-2">
+                      <Input
+                        id="address"
+                        name="address"
+                        value={orderData.address}
+                        onChange={handleInputChange}
+                        required
+                        className="w-full"
+                        placeholder="Enter your delivery address"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowLocationPicker(true)}
+                          className="flex items-center gap-2"
+                        >
+                          <Navigation className="h-4 w-4" />
+                          Pick on Map
+                        </Button>
+                        {selectedLocation && (
+                          <div className="flex-1 p-2 bg-green-50 border border-green-200 rounded-md">
+                            <div className="flex items-center gap-2 text-sm text-green-700">
+                              <MapPin className="h-4 w-4" />
+                              <span className="font-medium">Selected Location:</span>
+                            </div>
+                            <p className="text-xs text-green-600 mt-1 truncate">
+                              {selectedLocation.address}
+                            </p>
+                            <p className="text-xs text-green-500">
+                              Accuracy: ±{Math.round(selectedLocation.accuracy)}m
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -434,6 +473,21 @@ const Checkout: React.FC = () => {
           onPaymentError={handlePaymentError}
         />
       )}
+
+      {/* Location Picker Modal */}
+      <LocationPicker
+        isOpen={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        onLocationSelect={(location) => {
+          setSelectedLocation(location);
+          setOrderData(prev => ({
+            ...prev,
+            address: location.address
+          }));
+          setShowLocationPicker(false);
+        }}
+        initialLocation={selectedLocation || undefined}
+      />
     </div>
     </>
   );

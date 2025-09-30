@@ -845,6 +845,75 @@ const orderController = {
       });
     }
   },
+
+  // Get order tracking data for customer
+  getOrderTracking: async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const userId = req.user._id;
+
+      // Find the order and verify customer has access
+      const order = await Orders.findOne({
+        _id: orderId,
+        user: userId
+      }).populate('deliveryMan', '_id name phone vehicleType currentLocation');
+
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found or you are not authorized to view this order' });
+      }
+
+      // Prepare tracking data
+      let trackingData = {
+        order: {
+          _id: order._id,
+          status: order.status,
+          customerLocation: order.customerLocation,
+          deliveryAddress: order.deliveryAddress,
+          estimatedDeliveryTime: order.estimatedDeliveryTime,
+          actualDeliveryTime: order.actualDeliveryTime,
+          createdAt: order.createdAt,
+          deliveryNotes: order.deliveryNotes
+        },
+        deliveryMan: order.deliveryMan ? {
+          _id: order.deliveryMan._id,
+          name: order.deliveryMan.name,
+          phone: order.deliveryMan.phone,
+          vehicleType: order.deliveryMan.vehicleType,
+          currentLocation: order.deliveryMan.currentLocation && order.deliveryMan.currentLocation.coordinates ? {
+            latitude: order.deliveryMan.currentLocation.coordinates[1], // Convert [lng, lat] to lat
+            longitude: order.deliveryMan.currentLocation.coordinates[0] // Convert [lng, lat] to lng
+          } : null
+        } : null
+      };
+
+      // Calculate distance and ETA if delivery person is assigned and has location
+      if (order.deliveryMan && order.deliveryMan.currentLocation && order.deliveryMan.currentLocation.coordinates) {
+        const [deliveryLng, deliveryLat] = order.deliveryMan.currentLocation.coordinates;
+        const distance = calculateDistance(
+          order.customerLocation.latitude,
+          order.customerLocation.longitude,
+          deliveryLat,
+          deliveryLng
+        );
+
+        const etaUpdate = calculateRealTimeETA(order, order.deliveryMan, order.status);
+        const formattedETA = formatTimeEstimate(etaUpdate);
+
+        trackingData.distance = {
+          meters: Math.round(distance),
+          kilometers: Math.round(distance / 1000 * 100) / 100
+        };
+
+        trackingData.eta = formattedETA;
+      }
+
+      res.json(trackingData);
+
+    } catch (error) {
+      console.error('Get order tracking error:', error);
+      res.status(500).json({ message: 'Failed to get order tracking data' });
+    }
+  }
 };
 
 module.exports = orderController;

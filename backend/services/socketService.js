@@ -51,9 +51,21 @@ class SocketService {
             .then(order => {
               clearTimeout(queryTimeout);
               if (order && order.user) {
+                // Emit to both old and new event names for compatibility
                 socket.to(`user-${order.user._id}`).emit('location-update', {
                   orderId: data.orderId,
                   location: data.location,
+                  timestamp: data.timestamp
+                });
+                socket.to(`user-${order.user._id}`).emit('delivery-location-update', {
+                  orderId: data.orderId,
+                  location: {
+                    latitude: data.location.latitude,
+                    longitude: data.location.longitude,
+                    accuracy: data.location.accuracy || 10,
+                    speed: data.location.speed || 0,
+                    heading: data.location.heading || 0
+                  },
                   timestamp: data.timestamp
                 });
                 console.log(`📤 Location update sent to user ${order.user._id}`);
@@ -82,6 +94,7 @@ class SocketService {
           const Orders = require('../models/orderModel');
           Orders.findById(data.orderId)
             .populate('user', '_id')
+            .populate('deliveryMan', '_id name phone vehicleType currentLocation')
             .then(order => {
               if (order && order.user) {
                 socket.to(`user-${order.user._id}`).emit('delivery-update', {
@@ -91,6 +104,24 @@ class SocketService {
                   estimatedDeliveryTime: data.estimatedDeliveryTime,
                   actualDeliveryTime: data.actualDeliveryTime,
                   location: data.location
+                });
+                // Also emit order-updated event for TrackOrder component
+                socket.to(`user-${order.user._id}`).emit('order-updated', {
+                  order: {
+                    _id: order._id,
+                    status: order.status,
+                    customerLocation: order.customerLocation,
+                    deliveryMan: order.deliveryMan ? {
+                      _id: order.deliveryMan._id,
+                      name: order.deliveryMan.name,
+                      phone: order.deliveryMan.phone,
+                      vehicleType: order.deliveryMan.vehicleType,
+                      currentLocation: order.deliveryMan.currentLocation && order.deliveryMan.currentLocation.coordinates ? {
+                        latitude: order.deliveryMan.currentLocation.coordinates[1],
+                        longitude: order.deliveryMan.currentLocation.coordinates[0]
+                      } : null
+                    } : null
+                  }
                 });
                 console.log(`📤 Delivery update sent to user ${order.user._id}`);
               } else {

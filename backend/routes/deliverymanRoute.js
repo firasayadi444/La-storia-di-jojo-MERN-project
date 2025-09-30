@@ -51,4 +51,9 @@ router.delete('/:id', adminAuthMiddleware, deliverymanController.deleteById);
 // Get a single delivery man by ID - Admin only
 router.get('/:id', adminAuthMiddleware, deliverymanController.getById);
 
+// Delivery tracking routes (delivery man only)
+router.post('/location', authMiddleware, deliverymanController.updateLocation);
+router.get('/tracking/:orderId', authMiddleware, deliverymanController.getOrderTracking);
+router.put('/status', authMiddleware, deliverymanController.updateDeliveryStatus);
+
 module.exports = router; 

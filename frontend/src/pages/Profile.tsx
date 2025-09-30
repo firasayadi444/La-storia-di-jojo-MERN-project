@@ -5,24 +5,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  User, 
+  Edit3, 
+  Save, 
+  X, 
+  Calendar,
+  CheckCircle,
+  Shield
+} from 'lucide-react';
 
-interface Address {
-  _id?: string;
-  label: string;
-  address: string;
-  googleMapLink?: string;
-  isDefault?: boolean;
-}
 
 const Profile: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState({ name: '', email: '', phone: '', address: '' });
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [newAddress, setNewAddress] = useState<Address>({ label: '', address: '', googleMapLink: '', isDefault: false });
-  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -42,7 +44,8 @@ const Profile: React.FC = () => {
         localStorage.setItem('user', JSON.stringify(res.user));
         refreshUser();
       }
-      toast({ title: 'Profile updated!' });
+      toast({ title: 'Profile updated successfully!', description: 'Your profile has been updated.' });
+      setIsEditing(false);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Failed to update profile', variant: 'destructive' });
     } finally {
@@ -50,109 +53,149 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewAddress({ ...newAddress, [e.target.name]: e.target.value });
-  };
 
-  const handleAddAddress = async () => {
-    if (!newAddress.label || !newAddress.address) return;
-    setLoading(true);
-    try {
-      await apiService.addAddress(newAddress);
-      toast({ title: 'Address added!' });
-      setNewAddress({ label: '', address: '', googleMapLink: '', isDefault: false });
-      refreshUser();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to add address', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEditAddress = (address: Address) => {
-    setEditingAddress(address);
-  };
-
-  const handleUpdateAddress = async () => {
-    if (!editingAddress || !editingAddress._id) return;
-    setLoading(true);
-    try {
-      await apiService.updateAddress(editingAddress._id, editingAddress);
-      toast({ title: 'Address updated!' });
-      setEditingAddress(null);
-      refreshUser();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to update address', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteAddress = async (addressId: string) => {
-    setLoading(true);
-    try {
-      await apiService.deleteAddress(addressId);
-      toast({ title: 'Address deleted!' });
-      refreshUser();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to delete address', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSetDefault = async (address: Address) => {
-    if (!address._id) return;
-    setLoading(true);
-    try {
-      await apiService.updateAddress(address._id, { ...address, isDefault: true });
-      toast({ title: 'Default address set!' });
-      refreshUser();
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message || 'Failed to set default address', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-italian-cream-50 to-white py-8">
-      <div className="max-w-2xl mx-auto px-4">
-        <Card className="mb-8">
+      <div className="max-w-6xl mx-auto px-4">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+              <p className="text-gray-600 mt-1">Manage your account settings and preferences</p>
+            </div>
+            <Badge variant="outline" className="text-italian-green-600 border-italian-green-200">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Verified Account
+            </Badge>
+          </div>
+        </div>
+
+        {/* Profile Overview Card */}
+        <Card className="mb-8 overflow-hidden">
+          <div className="bg-gradient-to-r from-italian-green-500 to-italian-green-600 p-6 text-white">
+            <div className="flex items-center space-x-6">
+              <Avatar className="h-20 w-20 border-4 border-white">
+                <AvatarImage src="" alt={profile.name} />
+                <AvatarFallback className="text-2xl font-bold bg-white text-italian-green-600">
+                  {getInitials(profile.name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold">{profile.name}</h2>
+                <p className="text-italian-green-100">{profile.email}</p>
+                <div className="flex items-center mt-2 space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <Calendar className="h-4 w-4" />
+                    <span className="text-sm">Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+
+        {/* Profile Form */}
+        <Card>
           <CardHeader>
-            <CardTitle>Profile</CardTitle>
+            <CardTitle className="flex items-center">
+              <User className="h-5 w-5 mr-2" />
+              Personal Information
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" value={profile.name} onChange={handleProfileChange} />
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input 
+                  id="name" 
+                  name="name" 
+                  value={profile.name} 
+                  onChange={handleProfileChange}
+                  disabled={!isEditing}
+                  className={!isEditing ? 'bg-gray-50' : ''}
+                />
               </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" value={profile.email} onChange={handleProfileChange} />
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input 
+                  id="email" 
+                  name="email" 
+                  type="email"
+                  value={profile.email} 
+                  onChange={handleProfileChange}
+                  disabled={!isEditing}
+                  className={!isEditing ? 'bg-gray-50' : ''}
+                />
               </div>
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" name="phone" value={profile.phone} onChange={handleProfileChange} />
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input 
+                  id="phone" 
+                  name="phone" 
+                  value={profile.phone} 
+                  onChange={handleProfileChange}
+                  disabled={!isEditing}
+                  className={!isEditing ? 'bg-gray-50' : ''}
+                />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
-                <Input id="address" name="address" value={profile.address} onChange={handleProfileChange} />
+                <Input 
+                  id="address" 
+                  name="address" 
+                  value={profile.address} 
+                  onChange={handleProfileChange}
+                  disabled={!isEditing}
+                  className={!isEditing ? 'bg-gray-50' : ''}
+                />
               </div>
-              <Button onClick={handleProfileSave} disabled={loading} className="btn-gradient text-white mt-2">Save Profile</Button>
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-4">
+              {!isEditing ? (
+                <Button onClick={() => setIsEditing(true)} className="bg-italian-green-600 hover:bg-italian-green-700">
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  Edit Profile
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button onClick={handleProfileSave} disabled={loading} className="bg-italian-green-600 hover:bg-italian-green-700">
+                    <Save className="h-4 w-4 mr-2" />
+                    {loading ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
 
+        {/* Change Password Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Change Password</CardTitle>
+            <CardTitle className="flex items-center">
+              <Shield className="h-5 w-5 mr-2" />
+              Change Password
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <Button asChild className="btn-gradient text-white mt-2">
-              <a href="/change-password">Change Password</a>
-            </Button>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Want to change your password? Click the button below to update it.
+              </p>
+              <Button asChild className="bg-italian-green-600 hover:bg-italian-green-700">
+                <a href="/change-password">Change Password</a>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

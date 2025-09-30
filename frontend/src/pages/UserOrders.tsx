@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X, RefreshCw } from 'lucide-react';
+import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X, RefreshCw, MapPin } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService, Order } from '../services/api';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useSocket } from '../contexts/SocketContext';
+import TrackOrder from '@/components/TrackOrder';
 
 const UserOrders: React.FC = () => {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ const UserOrders: React.FC = () => {
   const [cancelConfirmDialog, setCancelConfirmDialog] = useState(false);
   const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
   const { registerRefreshCallback, unregisterRefreshCallback } = useSocket();
 
   useEffect(() => {
@@ -409,6 +411,19 @@ const UserOrders: React.FC = () => {
                   {/* Action Buttons */}
                   <div className="flex justify-end space-x-2 pt-4 border-t border-italian-cream-200">
 
+                    {/* Track Order Button for Active Orders */}
+                    {(order.status === 'confirmed' || order.status === 'preparing' || order.status === 'out_for_delivery') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTrackingOrder(order)}
+                        className="text-italian-green-600 border-italian-green-300 hover:bg-italian-green-50"
+                      >
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Track Order
+                      </Button>
+                    )}
+
                     {/* Cancel Button for Pending Orders */}
                     {order.status === 'pending' && (
                       <Button
@@ -586,6 +601,15 @@ const UserOrders: React.FC = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Track Order Modal */}
+        {trackingOrder && (
+          <TrackOrder
+            isOpen={!!trackingOrder}
+            onClose={() => setTrackingOrder(null)}
+            order={trackingOrder}
+          />
+        )}
       </div>
     </div>
   );
