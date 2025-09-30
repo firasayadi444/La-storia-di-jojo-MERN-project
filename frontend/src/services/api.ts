@@ -755,7 +755,8 @@ class ApiService {
     return handleResponse<Payment>(response);
   }
 
-  // Location API methods
+  // DEPRECATED: Location API methods - Use delivery tracking endpoints instead
+  // This method is kept for backward compatibility only
   async updateLocation(locationData: {
     latitude: number;
     longitude: number;
@@ -765,6 +766,7 @@ class ApiService {
     speed?: number;
     heading?: number;
   }): Promise<ApiResponse<Location>> {
+    console.warn('updateLocation is deprecated. Use updateDeliveryLocation for delivery tracking.');
     const token = getAuthToken();
     if (!token) throw new Error('Authentication required');
 
@@ -779,8 +781,10 @@ class ApiService {
     return handleResponse<Location>(response);
   }
 
-  // Get delivery person's location history for trajectory tracking
+  // DEPRECATED: Get delivery person's location history for trajectory tracking
+  // Use getDeliveryTracking instead for comprehensive tracking data
   async getDeliveryTrajectory(deliveryManId: string, orderId?: string): Promise<ApiResponse<Location[]>> {
+    console.warn('getDeliveryTrajectory is deprecated. Use getDeliveryTracking for comprehensive tracking data.');
     const token = getAuthToken();
     if (!token) throw new Error('Authentication required');
 
@@ -855,6 +859,462 @@ class ApiService {
       },
     });
     return handleResponse<{ deliveryMen: Array<Location & { user: User; distance: number }> }>(response);
+  }
+
+  // Delivery Tracking Methods
+  async startDelivery(orderId: string): Promise<ApiResponse<{
+    order: Order;
+    route: {
+      distance: number;
+      duration: number;
+      eta: string;
+      geometry: any;
+    };
+    deliveryHistory: string;
+  }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/${orderId}/start`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    return handleResponse<{
+      order: Order;
+      route: {
+        distance: number;
+        duration: number;
+        eta: string;
+        geometry: any;
+      };
+      deliveryHistory: string;
+    }>(response);
+  }
+
+  async updateDeliveryLocation(orderId: string, location: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    speed?: number;
+    heading?: number;
+  }): Promise<ApiResponse<{
+    location: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      timestamp: string;
+    };
+    eta: {
+      estimatedDeliveryTime: string;
+      remainingMinutes: number;
+      distance: number;
+    };
+  }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/${orderId}/location`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(location),
+    });
+    return handleResponse<{
+      location: {
+        latitude: number;
+        longitude: number;
+        accuracy: number;
+        timestamp: string;
+      };
+      eta: {
+        estimatedDeliveryTime: string;
+        remainingMinutes: number;
+        distance: number;
+      };
+    }>(response);
+  }
+
+  async getDeliveryTracking(orderId: string): Promise<ApiResponse<{
+    order: {
+      _id: string;
+      status: string;
+      deliveryAddress: string;
+      customerLocation: {
+        latitude: number;
+        longitude: number;
+        accuracy?: number;
+      };
+      estimatedDeliveryTime?: string;
+      actualDeliveryTime?: string;
+      deliveryNotes?: string;
+      assignedAt?: string;
+      createdAt: string;
+    };
+    deliveryMan: User;
+    currentLocation: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      timestamp: string;
+      speed?: number;
+      heading?: number;
+    } | null;
+    route: {
+      distance: number;
+      duration: number;
+      geometry: any;
+    } | null;
+    trajectory: Array<{
+      latitude: number;
+      longitude: number;
+      timestamp: string;
+      accuracy: number;
+      speed?: number;
+      heading?: number;
+    }>;
+    deliveryHistory: {
+      totalDistance: number;
+      totalTime: number;
+      averageSpeed: number;
+      statusHistory: Array<{
+        status: string;
+        timestamp: string;
+        location: {
+          latitude: number;
+          longitude: number;
+        };
+        notes: string;
+      }>;
+    } | null;
+  }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/${orderId}/tracking`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{
+      order: {
+        _id: string;
+        status: string;
+        deliveryAddress: string;
+        customerLocation: {
+          latitude: number;
+          longitude: number;
+          accuracy?: number;
+        };
+        estimatedDeliveryTime?: string;
+        actualDeliveryTime?: string;
+        deliveryNotes?: string;
+        assignedAt?: string;
+        createdAt: string;
+      };
+      deliveryMan: User;
+      currentLocation: {
+        latitude: number;
+        longitude: number;
+        accuracy: number;
+        timestamp: string;
+        speed?: number;
+        heading?: number;
+      } | null;
+      route: {
+        distance: number;
+        duration: number;
+        geometry: any;
+      } | null;
+      trajectory: Array<{
+        latitude: number;
+        longitude: number;
+        timestamp: string;
+        accuracy: number;
+        speed?: number;
+        heading?: number;
+      }>;
+      deliveryHistory: {
+        totalDistance: number;
+        totalTime: number;
+        averageSpeed: number;
+        statusHistory: Array<{
+          status: string;
+          timestamp: string;
+          location: {
+            latitude: number;
+            longitude: number;
+          };
+          notes: string;
+        }>;
+      } | null;
+    }>(response);
+  }
+
+  async completeDelivery(orderId: string, data: {
+    deliveryNotes?: string;
+    deliveryRating?: number;
+  }): Promise<ApiResponse<{ order: Order }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/${orderId}/complete`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<{ order: Order }>(response);
+  }
+
+  async getActiveDeliveries(): Promise<ApiResponse<{ deliveries: Order[] }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/active`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{ deliveries: Order[] }>(response);
+  }
+
+  async getDeliveryTrajectory(deliveryManId: string, orderId?: string): Promise<ApiResponse<{ trajectory: Array<{
+    latitude: number;
+    longitude: number;
+    timestamp: string;
+    accuracy: number;
+    speed?: number;
+    heading?: number;
+  }> }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const url = orderId 
+      ? `${this.baseURL}/delivery/${orderId}/trajectory`
+      : `${this.baseURL}/location/trajectory/${deliveryManId}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{ trajectory: Array<{
+      latitude: number;
+      longitude: number;
+      timestamp: string;
+      accuracy: number;
+      speed?: number;
+      heading?: number;
+    }> }>(response);
+  }
+
+  // New delivery tracking methods for the updated system
+  async getDeliveryTrackingData(orderId: string): Promise<ApiResponse<{
+    order: {
+      _id: string;
+      status: string;
+      deliveryAddress: string;
+      customerLocation: {
+        latitude: number;
+        longitude: number;
+        accuracy?: number;
+      };
+      estimatedDeliveryTime?: string;
+      actualDeliveryTime?: string;
+      deliveryNotes?: string;
+      assignedAt?: string;
+      createdAt: string;
+    };
+    deliveryMan: {
+      _id: string;
+      name: string;
+      email: string;
+      phone: string;
+    };
+    currentLocation: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      timestamp: string;
+      speed?: number;
+      heading?: number;
+    } | null;
+    route: {
+      distance: number;
+      duration: number;
+      geometry: any;
+    } | null;
+    trajectory: Array<{
+      latitude: number;
+      longitude: number;
+      timestamp: string;
+      accuracy: number;
+      speed?: number;
+      heading?: number;
+    }>;
+    deliveryHistory: {
+      totalDistance: number;
+      totalTime: number;
+      averageSpeed: number;
+      statusHistory: Array<{
+        status: string;
+        timestamp: string;
+        location: {
+          latitude: number;
+          longitude: number;
+        };
+        notes: string;
+      }>;
+    } | null;
+  }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/${orderId}/tracking`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{
+      order: {
+        _id: string;
+        status: string;
+        deliveryAddress: string;
+        customerLocation: {
+          latitude: number;
+          longitude: number;
+          accuracy?: number;
+        };
+        estimatedDeliveryTime?: string;
+        actualDeliveryTime?: string;
+        deliveryNotes?: string;
+        assignedAt?: string;
+        createdAt: string;
+      };
+      deliveryMan: {
+        _id: string;
+        name: string;
+        email: string;
+        phone: string;
+      };
+      currentLocation: {
+        latitude: number;
+        longitude: number;
+        accuracy: number;
+        timestamp: string;
+        speed?: number;
+        heading?: number;
+      } | null;
+      route: {
+        distance: number;
+        duration: number;
+        geometry: any;
+      } | null;
+      trajectory: Array<{
+        latitude: number;
+        longitude: number;
+        timestamp: string;
+        accuracy: number;
+        speed?: number;
+        heading?: number;
+      }>;
+      deliveryHistory: {
+        totalDistance: number;
+        totalTime: number;
+        averageSpeed: number;
+        statusHistory: Array<{
+          status: string;
+          timestamp: string;
+          location: {
+            latitude: number;
+            longitude: number;
+          };
+          notes: string;
+        }>;
+      } | null;
+    }>(response);
+  }
+
+  async updateDeliveryLocation(orderId: string, location: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    speed?: number;
+    heading?: number;
+  }): Promise<ApiResponse<{
+    location: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      timestamp: string;
+    };
+    eta: {
+      estimatedDeliveryTime: string;
+      remainingMinutes: number;
+      distance: number;
+    };
+  }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/${orderId}/location`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(location),
+    });
+    return handleResponse<{
+      location: {
+        latitude: number;
+        longitude: number;
+        accuracy: number;
+        timestamp: string;
+      };
+      eta: {
+        estimatedDeliveryTime: string;
+        remainingMinutes: number;
+        distance: number;
+      };
+    }>(response);
+  }
+
+  async completeDelivery(orderId: string, data: {
+    deliveryNotes?: string;
+    deliveryRating?: number;
+  }): Promise<ApiResponse<{ order: Order }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/${orderId}/complete`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<{ order: Order }>(response);
+  }
+
+  async getActiveDeliveries(): Promise<ApiResponse<{ deliveries: Order[] }>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${this.baseURL}/delivery/active`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{ deliveries: Order[] }>(response);
   }
 }
 

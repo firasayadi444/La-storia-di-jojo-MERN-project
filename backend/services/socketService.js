@@ -39,11 +39,17 @@ class SocketService {
         console.log(`📍 Location update from delivery person:`, data);
         // Broadcast location update to customer
         if (data.orderId) {
-          // Get the order to find the user ID
+          // Get the order to find the user ID with timeout
           const Orders = require('../models/orderModel');
+          const queryTimeout = setTimeout(() => {
+            console.error('❌ Database query timeout for location update');
+          }, 5000); // 5 second timeout
+
           Orders.findById(data.orderId)
             .populate('user', '_id')
+            .maxTimeMS(5000) // MongoDB query timeout
             .then(order => {
+              clearTimeout(queryTimeout);
               if (order && order.user) {
                 socket.to(`user-${order.user._id}`).emit('location-update', {
                   orderId: data.orderId,
@@ -56,7 +62,13 @@ class SocketService {
               }
             })
             .catch(error => {
+              clearTimeout(queryTimeout);
               console.error('Error finding order for location update:', error);
+              // Emit error to delivery person for retry
+              socket.emit('location-update-error', {
+                orderId: data.orderId,
+                error: 'Failed to broadcast location update'
+              });
             });
         }
       });
@@ -87,6 +99,99 @@ class SocketService {
             })
             .catch(error => {
               console.error('Error finding order for delivery update:', error);
+            });
+        }
+      });
+
+      // Handle delivery start event
+      socket.on('delivery-started', (data) => {
+        console.log(`🚀 Delivery started:`, data);
+        if (data.orderId) {
+          const Orders = require('../models/orderModel');
+          Orders.findById(data.orderId)
+            .populate('user', '_id')
+            .populate('deliveryMan', '_id name phone')
+            .then(order => {
+              if (order && order.user) {
+                // Notify customer
+                socket.to(`user-${order.user._id}`).emit('delivery-started', {
+                  orderId: data.orderId,
+                  deliveryMan: order.deliveryMan,
+                  estimatedDeliveryTime: data.estimatedDeliveryTime,
+                  route: data.route
+                });
+                
+                // Notify admins
+                socket.to('admin').emit('delivery-started', {
+                  orderId: data.orderId,
+                  deliveryMan: order.deliveryMan,
+                  customer: order.user
+                });
+                
+                console.log(`📤 Delivery started notifications sent`);
+              }
+            })
+            .catch(error => {
+              console.error('Error finding order for delivery start:', error);
+            });
+        }
+      });
+
+      // Handle delivery completion event
+      socket.on('delivery-completed', (data) => {
+        console.log(`✅ Delivery completed:`, data);
+        if (data.orderId) {
+          const Orders = require('../models/orderModel');
+          Orders.findById(data.orderId)
+            .populate('user', '_id')
+            .populate('deliveryMan', '_id name phone')
+            .then(order => {
+              if (order && order.user) {
+                // Notify customer
+                socket.to(`user-${order.user._id}`).emit('delivery-completed', {
+                  orderId: data.orderId,
+                  actualDeliveryTime: data.actualDeliveryTime,
+                  deliveryNotes: data.deliveryNotes,
+                  deliveryRating: data.deliveryRating
+                });
+                
+                // Notify admins
+                socket.to('admin').emit('delivery-completed', {
+                  orderId: data.orderId,
+                  deliveryMan: order.deliveryMan,
+                  customer: order.user,
+                  actualDeliveryTime: data.actualDeliveryTime
+                });
+                
+                console.log(`📤 Delivery completed notifications sent`);
+              }
+            })
+            .catch(error => {
+              console.error('Error finding order for delivery completion:', error);
+            });
+        }
+      });
+
+      // Handle ETA updates
+      socket.on('eta-update', (data) => {
+        console.log(`⏰ ETA update:`, data);
+        if (data.orderId) {
+          const Orders = require('../models/orderModel');
+          Orders.findById(data.orderId)
+            .populate('user', '_id')
+            .then(order => {
+              if (order && order.user) {
+                socket.to(`user-${order.user._id}`).emit('eta-update', {
+                  orderId: data.orderId,
+                  estimatedDeliveryTime: data.estimatedDeliveryTime,
+                  remainingMinutes: data.remainingMinutes,
+                  distance: data.distance
+                });
+                console.log(`📤 ETA update sent to user ${order.user._id}`);
+              }
+            })
+            .catch(error => {
+              console.error('Error finding order for ETA update:', error);
             });
         }
       });

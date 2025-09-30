@@ -50,7 +50,7 @@ global.generateTestToken = (userId, role = 'user') => {
   
   // Create token with the same structure as the auth controller
   return jwt.sign(
-    { _id: userId },
+    { _id: userId, role: role },
     secret,
     { expiresIn: '1h' }
   );

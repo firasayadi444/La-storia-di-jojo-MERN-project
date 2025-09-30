@@ -6,6 +6,8 @@ import { AuthProvider } from '../../contexts/AuthContext'
 import { CartProvider } from '../../contexts/CartContext'
 import { AvailabilityProvider } from '../../contexts/AvailabilityContext'
 import { AppProvider } from '../../contexts/AppContext'
+import { SocketProvider } from '../../contexts/SocketContext'
+import { Toaster } from '../../components/ui/toaster'
 
 // Create a custom render function that includes providers
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
@@ -21,13 +23,16 @@ const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <AvailabilityProvider>
-            <CartProvider>
-              <AppProvider>
-                {children}
-              </AppProvider>
-            </CartProvider>
-          </AvailabilityProvider>
+          <SocketProvider>
+            <AvailabilityProvider>
+              <CartProvider>
+                <AppProvider>
+                  {children}
+                  <Toaster />
+                </AppProvider>
+              </CartProvider>
+            </AvailabilityProvider>
+          </SocketProvider>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

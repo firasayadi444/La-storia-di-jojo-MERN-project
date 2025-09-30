@@ -2,7 +2,8 @@ const Location = require('../models/locationModel');
 const User = require('../models/userModel');
 
 const locationController = {
-  // Create/Update user location
+  // Legacy method - kept for backward compatibility
+  // Use delivery tracking endpoints for new implementations
   updateLocation: async (req, res) => {
     try {
       const { latitude, longitude, address, accuracy, altitude, speed, heading } = req.body;
@@ -56,7 +57,7 @@ const locationController = {
     }
   },
 
-  // Get user's location history
+  // Get user's location history (legacy - use delivery tracking for new implementations)
   getUserLocations: async (req, res) => {
     try {
       const userId = req.user._id;
@@ -95,7 +96,7 @@ const locationController = {
     }
   },
 
-  // Get current location of a user
+  // Get current location of a user (legacy - use delivery tracking for new implementations)
   getCurrentLocation: async (req, res) => {
     try {
       const { userId } = req.params;
@@ -195,7 +196,8 @@ const locationController = {
     }
   },
 
-  // Get delivery person's trajectory for a specific order
+  // DEPRECATED: Use delivery tracking endpoints instead
+  // This method is kept for backward compatibility only
   getDeliveryTrajectory: async (req, res) => {
     try {
       const { deliveryManId } = req.params;
@@ -246,7 +248,7 @@ const locationController = {
         .limit(100); // Limit to last 100 points
 
       res.json({
-        message: 'Trajectory retrieved successfully',
+        message: 'Trajectory retrieved successfully (DEPRECATED - use delivery tracking endpoints)',
         trajectory
       });
     } catch (error) {

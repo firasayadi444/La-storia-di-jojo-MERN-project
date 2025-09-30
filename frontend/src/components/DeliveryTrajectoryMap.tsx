@@ -145,7 +145,8 @@ const DeliveryTrajectoryMap: React.FC<DeliveryTrajectoryMapProps> = ({
 
       try {
         console.log('Fetching trajectory for deliveryManId:', deliveryManId, 'orderId:', orderId);
-        const response = await apiService.getDeliveryTrajectory(deliveryManId, orderId);
+        // Use new delivery tracking system instead of old trajectory method
+        const response = await apiService.getDeliveryTracking(orderId);
         console.log('Trajectory API response:', response);
         
         const trajectoryData = response.data || response.trajectory || [];
@@ -199,14 +200,19 @@ const DeliveryTrajectoryMap: React.FC<DeliveryTrajectoryMapProps> = ({
           latitude: data.location.lat,
           longitude: data.location.lng,
           timestamp: data.timestamp,
-          accuracy: 10,
-          speed: 0,
-          heading: 0
+          accuracy: data.accuracy || data.location.accuracy || 10, // Use actual accuracy from GPS
+          speed: data.speed || data.location.speed || 0,
+          heading: data.heading || data.location.heading || 0
         };
 
-        setTrajectory(prev => [...prev, newLocation]);
-        setCurrentLocation(newLocation);
-        onLocationUpdate?.(newLocation);
+        // Filter out inaccurate locations (accuracy > 100m)
+        if (newLocation.accuracy <= 100) {
+          setTrajectory(prev => [...prev, newLocation]);
+          setCurrentLocation(newLocation);
+          onLocationUpdate?.(newLocation);
+        } else {
+          console.warn('📍 Location update rejected due to poor accuracy:', newLocation.accuracy, 'meters');
+        }
       }
     };
 

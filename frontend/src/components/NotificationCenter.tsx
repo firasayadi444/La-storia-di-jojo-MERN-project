@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, X, Check, Trash2, Clock, Inbox } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useSocket } from '@/contexts/SocketContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { apiService } from '@/services/api';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { ScrollArea } from './ui/scroll-area';
+import { useSocket } from '../contexts/SocketContext';
+import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/api';
 import { formatDistanceToNow } from 'date-fns';
-import type { Order } from '@/services/api';
+import type { Order } from '../services/api';
 
 const NotificationCenter: React.FC = () => {
   const { notifications, removeNotification, clearNotifications } = useSocket();

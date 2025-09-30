@@ -13,6 +13,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   loading: boolean;
+  isLoading: boolean; // Add this for test compatibility
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -124,7 +125,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateUserAvailability,
     isAuthenticated: !!user && !!token,
     isAdmin: user?.role === 'admin',
-    loading
+    loading,
+    isLoading: loading // Add this for test compatibility
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

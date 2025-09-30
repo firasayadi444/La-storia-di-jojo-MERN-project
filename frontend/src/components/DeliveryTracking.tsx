@@ -74,6 +74,8 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ order, onClose }) =
   const [actualTime, setActualTime] = useState(order.actualDeliveryTime);
   const [deliveryNotes, setDeliveryNotes] = useState(order.deliveryNotes);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [realTimeETA, setRealTimeETA] = useState(null);
+  const [distance, setDistance] = useState(null);
   const { socket, registerRefreshCallback, unregisterRefreshCallback } = useSocket();
 
   // Register for real-time updates
@@ -118,14 +120,69 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ order, onClose }) =
       }
     };
 
+    const handleSocketError = (error: any) => {
+      console.error('Socket error in delivery tracking:', error);
+      // Attempt to reconnect or show error message
+      setIsRefreshing(true);
+      setTimeout(() => {
+        setIsRefreshing(false);
+        // Could trigger a manual refresh here
+      }, 2000);
+    };
+
+    const handleLocationUpdateError = (data: any) => {
+      if (data.orderId === order._id) {
+        console.warn('Location update failed, will retry:', data.error);
+        // Could implement retry logic here
+      }
+    };
+
     socket.on('delivery-update', handleDeliveryUpdate);
     socket.on('order-updated', handleDeliveryUpdate);
+    socket.on('connect_error', handleSocketError);
+    socket.on('location-update-error', handleLocationUpdateError);
 
     return () => {
       socket.off('delivery-update', handleDeliveryUpdate);
       socket.off('order-updated', handleDeliveryUpdate);
+      socket.off('connect_error', handleSocketError);
+      socket.off('location-update-error', handleLocationUpdateError);
     };
   }, [socket, order._id]);
+
+  // Fetch real-time ETA
+  const fetchRealTimeETA = async () => {
+    try {
+      const response = await fetch(`/api/orders/${order._id}/eta`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRealTimeETA(data.timeEstimate);
+        if (data.timeEstimate?.distance) {
+          setDistance(data.timeEstimate.distance);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching real-time ETA:', error);
+    }
+  };
+
+  // Fetch ETA on component mount and when delivery person changes
+  useEffect(() => {
+    if (deliveryMan && deliveryStatus === 'out_for_delivery') {
+      fetchRealTimeETA();
+      
+      // Update ETA every 30 seconds when delivery is in progress
+      const etaInterval = setInterval(fetchRealTimeETA, 30000);
+      
+      return () => clearInterval(etaInterval);
+    }
+  }, [deliveryMan, deliveryStatus, order._id]);
 
   const getStatusInfo = (status: string) => {
     switch (status) {
@@ -202,21 +259,58 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ order, onClose }) =
 
   const getEstimatedDeliveryTime = () => {
     if (actualTime) return formatTime(actualTime);
+    
+    // Use real-time ETA if available and delivery is in progress
+    if (realTimeETA && deliveryStatus === 'out_for_delivery') {
+      const isOverdue = realTimeETA.isOverdue;
+      const timeText = realTimeETA.formattedTime;
+      return isOverdue ? `Overdue by ${timeText}` : timeText;
+    }
+    
     if (estimatedTime) return formatTime(estimatedTime);
     return 'Not estimated yet';
+  };
+
+  const getDistanceInfo = () => {
+    if (distance && deliveryStatus === 'out_for_delivery') {
+      const distanceKm = (distance / 1000).toFixed(1);
+      return `${distanceKm} km away`;
+    }
+    return null;
   };
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
       <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-lg">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Truck className="h-6 w-6" />
-            Delivery Tracking
-          </CardTitle>
-          {isRefreshing && (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          )}
+          <div className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <Truck className="h-6 w-6" />
+              Delivery Tracking
+            </CardTitle>
+            {realTimeETA && deliveryStatus === 'out_for_delivery' && (
+              <div className="flex items-center gap-1 text-sm">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-white/80">Live</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {deliveryStatus === 'out_for_delivery' && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={fetchRealTimeETA}
+                disabled={isRefreshing}
+                className="text-white hover:bg-white/20"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            )}
+            {isRefreshing && (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            )}
+          </div>
         </div>
         <p className="text-blue-100">Order #{order._id.slice(-6)}</p>
       </CardHeader>
@@ -345,6 +439,12 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ order, onClose }) =
               <span className="text-gray-600">Estimated Delivery:</span>
               <span className="font-medium">{getEstimatedDeliveryTime()}</span>
             </div>
+            {getDistanceInfo() && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Distance:</span>
+                <span className="font-medium">{getDistanceInfo()}</span>
+              </div>
+            )}
             {deliveryNotes && (
               <div className="flex justify-between">
                 <span className="text-gray-600">Delivery Notes:</span>

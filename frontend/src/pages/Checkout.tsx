@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import StripePayment from '@/components/StripePayment';
 import { CheckCircle, CreditCard, Banknote, ArrowLeft, Shield, Clock, MapPin, User, Phone, Mail, Sparkles } from 'lucide-react';
+import CustomerLocationPicker from '../components/CustomerLocationPicker';
 
 const Checkout: React.FC = () => {
   const { items, getTotalPrice, clearCart } = useCart();
@@ -34,6 +35,7 @@ const Checkout: React.FC = () => {
   const [manualLocation, setManualLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showManualLocation, setShowManualLocation] = useState<boolean>(false);
   const [locationRetryCount, setLocationRetryCount] = useState<number>(0);
+  const [showLocationPicker, setShowLocationPicker] = useState<boolean>(false);
 
   if (!isAuthenticated) {
     navigate('/login');
@@ -409,6 +411,18 @@ const Checkout: React.FC = () => {
     return customerLocation || manualLocation;
   };
 
+  const handleLocationSelect = (location: { lat: number; lng: number; accuracy?: number }) => {
+    setCustomerLocation(location);
+    setLocationPermission('granted');
+    setLocationError(null);
+    setShowLocationPicker(false);
+    
+    toast({
+      title: "Location Selected",
+      description: `Location set: ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`,
+    });
+  };
+
   const hasLocation = () => {
     const location = getCurrentLocation();
     const hasValidLocation = location && 
@@ -732,6 +746,16 @@ const Checkout: React.FC = () => {
                             </Button>
                           ) : null;
                         })()}
+                        <Button
+                          type="button"
+                          onClick={() => setShowLocationPicker(true)}
+                          variant="outline"
+                          size="sm"
+                          className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                        >
+                          <MapPin className="h-4 w-4 mr-2" />
+                          Select on Map
+                        </Button>
                         <Button
                           type="button"
                           onClick={() => setShowManualLocation(true)}
@@ -1063,6 +1087,14 @@ const Checkout: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Customer Location Picker Modal */}
+      <CustomerLocationPicker
+        isOpen={showLocationPicker}
+        onLocationSelect={handleLocationSelect}
+        onClose={() => setShowLocationPicker(false)}
+        initialLocation={getCurrentLocation() || undefined}
+      />
     </div>
     </>
   );

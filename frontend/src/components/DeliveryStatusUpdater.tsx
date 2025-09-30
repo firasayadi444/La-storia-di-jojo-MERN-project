@@ -108,8 +108,8 @@ const DeliveryStatusUpdater: React.FC<DeliveryStatusUpdaterProps> = ({
               // Update local state
               setLocation(newLocation);
               
-              // Save to database
-              await apiService.updateLocation({
+              // Save to database using new delivery tracking system
+              await apiService.updateDeliveryLocation(orderId, {
                 latitude: newLocation.lat,
                 longitude: newLocation.lng,
                 accuracy: position.coords.accuracy || 10,
@@ -118,10 +118,13 @@ const DeliveryStatusUpdater: React.FC<DeliveryStatusUpdaterProps> = ({
                 isActive: true
               });
               
-              // Emit real-time update
+              // Emit real-time update with accuracy data
               socket.emit('location-update', {
                 orderId: order._id,
                 location: newLocation,
+                accuracy: position.coords.accuracy || 10,
+                speed: position.coords.speed || 0,
+                heading: position.coords.heading || 0,
                 timestamp: new Date().toISOString()
               });
               
@@ -129,6 +132,40 @@ const DeliveryStatusUpdater: React.FC<DeliveryStatusUpdaterProps> = ({
             },
             (error) => {
               console.error('Error getting location:', error);
+              // Implement retry mechanism for location errors
+              if (error.code === error.TIMEOUT) {
+                console.log('📍 Location timeout, retrying...');
+                // Retry with longer timeout
+                navigator.geolocation.getCurrentPosition(
+                  async (position) => {
+                    const newLocation = {
+                      lat: position.coords.latitude,
+                      lng: position.coords.longitude
+                    };
+                    setLocation(newLocation);
+                    await apiService.updateDeliveryLocation(orderId, {
+                      latitude: newLocation.lat,
+                      longitude: newLocation.lng,
+                      accuracy: position.coords.accuracy || 10,
+                      speed: position.coords.speed || 0,
+                      heading: position.coords.heading || 0,
+                      isActive: true
+                    });
+                    socket.emit('location-update', {
+                      orderId: order._id,
+                      location: newLocation,
+                      accuracy: position.coords.accuracy || 10,
+                      speed: position.coords.speed || 0,
+                      heading: position.coords.heading || 0,
+                      timestamp: new Date().toISOString()
+                    });
+                  },
+                  (retryError) => {
+                    console.error('Location retry failed:', retryError);
+                  },
+                  { timeout: 10000, enableHighAccuracy: true, maximumAge: 0 }
+                );
+              }
             }
           );
         } catch (error) {
@@ -220,7 +257,7 @@ const DeliveryStatusUpdater: React.FC<DeliveryStatusUpdaterProps> = ({
         // Automatically share location when starting delivery
         if (location) {
           try {
-            await apiService.updateLocation({
+            await apiService.updateDeliveryLocation(orderId, {
               latitude: location.lat,
               longitude: location.lng,
               accuracy: 10,
@@ -286,8 +323,8 @@ const DeliveryStatusUpdater: React.FC<DeliveryStatusUpdaterProps> = ({
     if (!location || !socket) return;
 
     try {
-      // Save location to database
-      await apiService.updateLocation({
+      // Save location to database using new delivery tracking system
+      await apiService.updateDeliveryLocation(orderId, {
         latitude: location.lat,
         longitude: location.lng,
         accuracy: 10, // Default accuracy

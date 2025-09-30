@@ -50,13 +50,18 @@ describe('Order Management Endpoints', () => {
       }],
       totalAmount: testFood.price * 2,
       deliveryAddress: '123 Test Street',
+      customerLocation: {
+        latitude: 40.7128,
+        longitude: -74.0060,
+        accuracy: 10
+      },
       status: 'pending'
     });
   });
 
   describe('POST /api/order/new', () => {
     it('should create a new order successfully', async () => {
-      const token = global.generateTestToken(customer._id);
+      const token = global.generateTestToken(customer._id, 'user');
       const orderData = {
         items: [{
           food: testFood._id,
@@ -64,7 +69,12 @@ describe('Order Management Endpoints', () => {
           price: testFood.price
         }],
         totalAmount: testFood.price,
-        deliveryAddress: '456 New Street'
+        deliveryAddress: '456 New Street',
+        customerLocation: {
+          latitude: 40.7128,
+          longitude: -74.0060,
+          accuracy: 10
+        }
       };
 
       const response = await request(app)
@@ -103,7 +113,7 @@ describe('Order Management Endpoints', () => {
     });
 
     it('should return 400 for invalid order data', async () => {
-      const token = global.generateTestToken(customer._id);
+      const token = global.generateTestToken(customer._id, 'user');
       const orderData = {
         items: [],
         totalAmount: 0,
@@ -122,7 +132,7 @@ describe('Order Management Endpoints', () => {
 
   describe('GET /api/orders/user', () => {
     it('should get user orders successfully', async () => {
-      const token = global.generateTestToken(customer._id);
+      const token = global.generateTestToken(customer._id, 'user');
 
       const response = await request(app)
         .get('/api/orders/user')
@@ -150,7 +160,7 @@ describe('Order Management Endpoints', () => {
 
   describe('GET /api/orders', () => {
     it('should get all orders as admin', async () => {
-      const token = global.generateTestToken(adminUser._id);
+      const token = global.generateTestToken(adminUser._id, 'admin');
 
       const response = await request(app)
         .get('/api/orders')
@@ -163,7 +173,7 @@ describe('Order Management Endpoints', () => {
     });
 
     it('should return 403 for non-admin users', async () => {
-      const token = global.generateTestToken(customer._id);
+      const token = global.generateTestToken(customer._id, 'user');
 
       const response = await request(app)
         .get('/api/orders')
@@ -176,7 +186,7 @@ describe('Order Management Endpoints', () => {
 
   describe('PUT /api/orders/:id/status', () => {
     it('should update order status as admin', async () => {
-      const token = global.generateTestToken(adminUser._id);
+      const token = global.generateTestToken(adminUser._id, 'admin');
       const updateData = {
         status: 'confirmed',
         deliveryManId: deliveryMan._id
@@ -203,7 +213,7 @@ describe('Order Management Endpoints', () => {
       testOrder.status = 'ready';
       await testOrder.save();
 
-      const token = global.generateTestToken(deliveryMan._id);
+      const token = global.generateTestToken(deliveryMan._id, 'delivery');
       const updateData = {
         status: 'out_for_delivery'
       };
@@ -219,7 +229,7 @@ describe('Order Management Endpoints', () => {
     });
 
     it('should return 404 for non-existent order', async () => {
-      const token = global.generateTestToken(adminUser._id);
+      const token = global.generateTestToken(adminUser._id, 'admin');
       const fakeId = '507f1f77bcf86cd799439011';
       const updateData = {
         status: 'confirmed'
@@ -242,7 +252,7 @@ describe('Order Management Endpoints', () => {
       testOrder.status = 'ready';
       await testOrder.save();
 
-      const token = global.generateTestToken(deliveryMan._id);
+      const token = global.generateTestToken(deliveryMan._id, 'delivery');
 
       const response = await request(app)
         .get('/api/orders/delivery')
@@ -255,7 +265,7 @@ describe('Order Management Endpoints', () => {
     });
 
     it('should return 403 for non-delivery users', async () => {
-      const token = global.generateTestToken(customer._id);
+      const token = global.generateTestToken(customer._id, 'user');
 
       const response = await request(app)
         .get('/api/orders/delivery')
@@ -272,7 +282,7 @@ describe('Order Management Endpoints', () => {
       testOrder.status = 'delivered';
       await testOrder.save();
 
-      const token = global.generateTestToken(customer._id);
+      const token = global.generateTestToken(customer._id, 'user');
       const feedbackData = {
         rating: 5,
         comment: 'Great service!'
@@ -289,7 +299,7 @@ describe('Order Management Endpoints', () => {
     });
 
     it('should return 400 for non-delivered order', async () => {
-      const token = global.generateTestToken(customer._id);
+      const token = global.generateTestToken(customer._id, 'user');
       const feedbackData = {
         rating: 5,
         comment: 'Great service!'

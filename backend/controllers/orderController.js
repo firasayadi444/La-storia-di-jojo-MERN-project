@@ -4,6 +4,7 @@ const Foods = require("../models/foodModel");
 const { makeOrderErrorHandler } = require("../utils/errorHandler");
 const nodemailer = require("nodemailer");
 const socketService = require("../services/socketService");
+const { findNearestDeliveryPerson, calculateRealTimeETA, formatTimeEstimate } = require("../utils/distanceCalculator");
 
 const orderController = {
   makeOrder: async (req, res) => {
@@ -97,12 +98,144 @@ const orderController = {
       } else {
       }
 
+      // Try to automatically assign the nearest delivery person
+      try {
+        await orderController.autoAssignDeliveryPerson(order._id);
+      } catch (assignError) {
+        console.log('Auto-assignment failed, order will be assigned manually:', assignError.message);
+      }
+
       res.status(201).json({
         message: "Order placed successfully",
         order
       });
     } catch (error) {
       return res.status(500).json({ message: error.message });
+    }
+  },
+
+  // Auto-assign the nearest available delivery person
+  autoAssignDeliveryPerson: async (orderId) => {
+    try {
+      const order = await Orders.findById(orderId).populate('user', 'name email phone');
+      if (!order) {
+        throw new Error('Order not found');
+      }
+
+      // Get all available delivery persons with location data
+      const availableDeliveryPersons = await Users.find({
+        role: 'delivery',
+        status: 'active',
+        isAvailable: true,
+        currentLocation: { $exists: true, $ne: null }
+      });
+
+      if (availableDeliveryPersons.length === 0) {
+        console.log('No available delivery persons found');
+        return null;
+      }
+
+      // Find the nearest delivery person
+      const nearestAssignment = findNearestDeliveryPerson(
+        availableDeliveryPersons,
+        order.customerLocation.latitude,
+        order.customerLocation.longitude
+      );
+
+      if (!nearestAssignment) {
+        console.log('No delivery person found within reasonable distance');
+        return null;
+      }
+
+      const { deliveryPerson, distance, timeEstimate } = nearestAssignment;
+
+      // Update the order with the assigned delivery person and time estimate
+      const updatedOrder = await Orders.findByIdAndUpdate(
+        orderId,
+        {
+          deliveryMan: deliveryPerson._id,
+          estimatedDeliveryTime: timeEstimate.estimatedDeliveryTime,
+          assignedAt: new Date()
+        },
+        { new: true }
+      ).populate('deliveryMan', 'name email phone vehicleType');
+
+      // Notify the assigned delivery person
+      const io = socketService.getIO();
+      if (io) {
+        io.to(`delivery-${deliveryPerson._id}`).emit('delivery-assigned', {
+          type: 'delivery-assigned',
+          order: updatedOrder,
+          distance: distance,
+          timeEstimate: formatTimeEstimate(timeEstimate),
+          message: `You have been assigned to deliver order #${orderId.slice(-8)}. Distance: ${Math.round(distance/1000)}km, ETA: ${formatTimeEstimate(timeEstimate).formattedTime}`
+        });
+      }
+
+      console.log(`Auto-assigned delivery person ${deliveryPerson.name} to order ${orderId}. Distance: ${Math.round(distance/1000)}km`);
+      
+      return {
+        deliveryPerson,
+        distance,
+        timeEstimate: formatTimeEstimate(timeEstimate)
+      };
+    } catch (error) {
+      console.error('Error in auto-assignment:', error);
+      throw error;
+    }
+  },
+
+  // Get real-time ETA for an order
+  getRealTimeETA: async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const userId = req.user._id;
+      const userRole = req.user.role;
+
+      const order = await Orders.findById(orderId)
+        .populate('user', 'name email phone')
+        .populate('deliveryMan', 'name phone vehicleType currentLocation');
+
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      // Check permissions
+      const isCustomer = String(order.user._id) === String(userId);
+      const isDeliveryMan = order.deliveryMan && String(order.deliveryMan._id) === String(userId);
+      const isAdmin = userRole === 'admin';
+
+      if (!isCustomer && !isDeliveryMan && !isAdmin) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      if (!order.deliveryMan || !order.deliveryMan.currentLocation) {
+        return res.status(400).json({ message: 'No delivery person assigned or location not available' });
+      }
+
+      // Calculate real-time ETA
+      const timeEstimate = calculateRealTimeETA(order, order.deliveryMan, order.status);
+      
+      if (!timeEstimate) {
+        return res.status(400).json({ message: 'Unable to calculate ETA' });
+      }
+
+      const formattedEstimate = formatTimeEstimate(timeEstimate);
+
+      res.json({
+        orderId: order._id,
+        status: order.status,
+        deliveryMan: {
+          name: order.deliveryMan.name,
+          phone: order.deliveryMan.phone,
+          vehicleType: order.deliveryMan.vehicleType
+        },
+        timeEstimate: formattedEstimate,
+        lastUpdated: new Date()
+      });
+    } catch (error) {
+      console.error('Error getting real-time ETA:', error);
+      res.status(500).json({ message: 'Failed to get ETA' });
     }
   },
 

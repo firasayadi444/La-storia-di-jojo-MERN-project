@@ -4,14 +4,14 @@ import { ShoppingCart, User, Menu, LogOut, Home, Truck, FileText, Users, BarChar
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useAvailability } from '../contexts/AvailabilityContext';
-import { Button } from '@/components/ui/button';
+import { Button } from './ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
+} from './ui/dropdown-menu';
+import { Badge } from './ui/badge';
 import { apiService } from '../services/api';
 import type { Order } from '../services/api';
 import NotificationCenter from './NotificationCenter';

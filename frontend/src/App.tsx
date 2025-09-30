@@ -35,6 +35,8 @@ import UserOrdersHistory from './pages/UserOrdersHistory';
 import Profile from './pages/Profile';
 import AdminOrdersHistory from './pages/AdminOrdersHistory';
 import DeliveryTrackingPage from './pages/DeliveryTrackingPage';
+import DeliveryHistory from './pages/DeliveryHistory';
+import TrackDelivery from './pages/TrackDelivery';
 
 const queryClient = new QueryClient();
 
@@ -63,8 +65,9 @@ const App = () => (
                         <Route path="/cart" element={<ProtectedRoute requireAuth><Cart /></ProtectedRoute>} />
                         <Route path="/checkout" element={<ProtectedRoute requireAuth><Checkout /></ProtectedRoute>} />
                         <Route path="/dashboard" element={<ProtectedRoute requireAuth requireDelivery><Dashboard /></ProtectedRoute>} />
-                                 <Route path="/delivery" element={<ProtectedRoute requireAuth requireDelivery><DeliveryDashboard /></ProtectedRoute>} />
-                                 <Route path="/delivery-stats" element={<ProtectedRoute requireAuth requireDelivery><DeliveryStats /></ProtectedRoute>} />
+                        <Route path="/delivery" element={<ProtectedRoute requireAuth requireDelivery><DeliveryDashboard /></ProtectedRoute>} />
+                        <Route path="/delivery-stats" element={<ProtectedRoute requireAuth requireDelivery><DeliveryStats /></ProtectedRoute>} />
+                        <Route path="/delivery-history" element={<ProtectedRoute requireAuth requireDelivery><DeliveryHistory /></ProtectedRoute>} />
                         <Route path="/admin/orders" element={<ProtectedRoute requireAuth requireAdmin><AdminOrders /></ProtectedRoute>} />
                         <Route path="/admin/users" element={<ProtectedRoute requireAuth requireAdmin><AdminUsers /></ProtectedRoute>} />
                         <Route path="/admin/deliverymen" element={<ProtectedRoute requireAuth requireAdmin><AdminDeliverymen /></ProtectedRoute>} />
@@ -73,7 +76,7 @@ const App = () => (
                         <Route path="/admin/add-food" element={<ProtectedRoute requireAuth requireAdmin><AdminFoodManagement /></ProtectedRoute>} />
                         <Route path="/orders" element={<ProtectedRoute requireAuth requireUser><UserOrders /></ProtectedRoute>} />
                         <Route path="/orders/history" element={<ProtectedRoute requireAuth requireUser><UserOrdersHistory /></ProtectedRoute>} />
-                        <Route path="/track-delivery/:orderId" element={<ProtectedRoute requireAuth requireUser><DeliveryTrackingPage /></ProtectedRoute>} />
+                        <Route path="/track-delivery/:orderId" element={<ProtectedRoute requireAuth requireUser><TrackDelivery /></ProtectedRoute>} />
                         <Route path="/profile" element={<ProtectedRoute requireAuth requireUser><Profile /></ProtectedRoute>} />
                         <Route path="/admin/ordershistory" element={<ProtectedRoute requireAuth requireAdmin><AdminOrdersHistory /></ProtectedRoute>} />
                         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

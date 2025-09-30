@@ -4,9 +4,9 @@ import { Plus } from 'lucide-react';
 import { Food } from '../services/api';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { Button } from './ui/button';
+import { Card, CardContent } from './ui/card';
+import { useToast } from '../hooks/use-toast';
 
 interface FoodCardProps {
   food: Food;
