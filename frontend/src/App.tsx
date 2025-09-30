@@ -62,7 +62,7 @@ const App = () => (
                         <Route path="/food/:id" element={<FoodDetail />} />
                         <Route path="/cart" element={<ProtectedRoute requireAuth><Cart /></ProtectedRoute>} />
                         <Route path="/checkout" element={<ProtectedRoute requireAuth><Checkout /></ProtectedRoute>} />
-                        <Route path="/dashboard" element={<ProtectedRoute requireAuth requireDelivery><Dashboard /></ProtectedRoute>} />
+                        <Route path="/dashboard" element={<ProtectedRoute requireAuth requireAdmin><Dashboard /></ProtectedRoute>} />
                         <Route path="/delivery" element={<ProtectedRoute requireAuth requireDelivery><DeliveryDashboard /></ProtectedRoute>} />
                         <Route path="/delivery-stats" element={<ProtectedRoute requireAuth requireDelivery><DeliveryStats /></ProtectedRoute>} />
                         <Route path="/delivery-history" element={<ProtectedRoute requireAuth requireDelivery><DeliveryHistory /></ProtectedRoute>} />

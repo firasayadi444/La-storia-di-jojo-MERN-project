@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, Heart, Share2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ const FoodDetail: React.FC = () => {
   const [food, setFood] = useState<Food | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   useEffect(() => {
     const fetchFood = async () => {
@@ -69,21 +70,7 @@ const FoodDetail: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!isAuthenticated) {
-      toast({
-        title: "Benvenuto! Please login",
-        description: "Join our famiglia to add delicious items to your cart",
-        variant: "destructive"
-      });
       navigate('/login');
-      return;
-    }
-
-    if (user?.role !== 'user') {
-      toast({
-        title: "Access Restricted",
-        description: "Only customers can add items to cart and place orders",
-        variant: "destructive"
-      });
       return;
     }
 
@@ -104,79 +91,114 @@ const FoodDetail: React.FC = () => {
         <Button
           onClick={() => navigate(-1)}
           variant="ghost"
-          className="mb-6 flex items-center space-x-2 text-italian-green-700 hover:text-italian-green-800 hover:bg-italian-cream-100"
+          className="mb-6 flex items-center space-x-2 text-italian-green-700 hover:text-italian-green-800 hover:bg-italian-cream-100 transition-all duration-300"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Torna al Menu</span>
         </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Food Image */}
-          <div className="animate-fade-in">
-            <div className="relative rounded-2xl overflow-hidden shadow-xl">
-              <img
-                src={food.image}
-                alt={food.name}
-                className="w-full h-96 lg:h-[500px] object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=600&h=500&fit=crop`;
-                }}
-              />
-              <div className="absolute top-4 left-4">
-                <Badge className="bg-white/95 text-italian-green-700 font-medium border border-italian-cream-200">
+        {/* Hero Section */}
+        <div className="relative mb-12">
+          <div className="relative rounded-3xl overflow-hidden shadow-2xl recipe-hero">
+            <img
+              src={food.image}
+              alt={food.name}
+              className="w-full h-[400px] lg:h-[500px] object-cover transition-transform duration-700 hover:scale-105"
+              onError={(e) => {
+                e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=1200&h=500&fit=crop`;
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+            
+            {/* Overlay Content */}
+            <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+              <div className="flex flex-wrap items-center gap-4 mb-4">
+                <Badge className="recipe-badge text-italian-green-700 font-medium">
                   {food.category}
                 </Badge>
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
+              
+              <h1 className="text-4xl lg:text-5xl font-serif font-bold mb-4 animate-fade-in">
+                {food.name}
+              </h1>
+              
+              <p className="text-lg opacity-90 max-w-2xl leading-relaxed animate-slide-up">
+                {food.description}
+              </p>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="absolute top-6 right-6 flex gap-3">
+              <Button
+                onClick={() => setIsFavorited(!isFavorited)}
+                variant="ghost"
+                size="sm"
+                className={`rounded-full w-12 h-12 recipe-favorite-btn ${
+                  isFavorited 
+                    ? 'bg-red-500 text-white hover:bg-red-600 favorited' 
+                    : 'bg-white/90 text-gray-700 hover:bg-white'
+                }`}
+              >
+                <Heart className={`h-5 w-5 ${isFavorited ? 'fill-current' : ''}`} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full w-12 h-12 bg-white/90 text-gray-700 hover:bg-white recipe-action-btn"
+              >
+                <Share2 className="h-5 w-5" />
+              </Button>
             </div>
           </div>
+        </div>
 
-          {/* Food Details */}
-          <div className="animate-scale-in">
-            <Card className="p-8 shadow-xl border-0 card-warm h-fit">
-              <CardContent className="p-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">🇮🇹</span>
-                  <span className="text-sm text-italian-green-600 font-medium">Ricetta Autentica</span>
-                </div>
-                
-                <h1 className="text-3xl lg:text-4xl font-serif font-bold text-italian-green-800 mb-4">
-                  {food.name}
-                </h1>
-                
-                <div className="flex items-center mb-6">
-                  <span className="text-3xl font-bold text-italian-green-700">
-                    €{food.price.toFixed(2)}
-                  </span>
-                  <span className="ml-2 text-sm text-italian-green-600">per porzione</span>
-                </div>
-
-                <p className="text-italian-green-700 text-lg mb-8 leading-relaxed font-light">
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Recipe Details */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Simple Description Card */}
+            <Card className="p-8 shadow-lg border-0 glass-card-food animate-fade-in">
+              <div className="space-y-6">
+                <p className="text-italian-green-700 text-lg leading-relaxed font-light">
                   {food.description}
                 </p>
+              </div>
+            </Card>
+          </div>
+
+          {/* Right Column - Order Card */}
+          <div className="lg:col-span-1">
+            <Card className="p-8 shadow-xl border-0 glass-card-food sticky top-8 recipe-card-hover">
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-italian-green-700 mb-2 recipe-price-glow px-4 py-2 rounded-lg">
+                    €{food.price.toFixed(2)}
+                  </div>
+                  <div className="text-sm text-gray-600">per serving</div>
+                </div>
 
                 {/* Quantity Selector */}
-                <div className="mb-8">
+                <div>
                   <label className="block text-sm font-medium text-italian-green-800 mb-3">
-                    Quantità
+                    Quantity
                   </label>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center justify-center space-x-4">
                     <Button
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
                       variant="outline"
                       size="sm"
-                      className="w-10 h-10 rounded-full border-italian-green-300 hover:bg-italian-green-50"
+                      className="w-12 h-12 rounded-full border-italian-green-300 hover:bg-italian-green-50"
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
-                    <span className="text-xl font-medium w-8 text-center text-italian-green-800">
+                    <span className="text-2xl font-bold w-12 text-center text-italian-green-800">
                       {quantity}
                     </span>
                     <Button
                       onClick={() => setQuantity(quantity + 1)}
                       variant="outline"
                       size="sm"
-                      className="w-10 h-10 rounded-full border-italian-green-300 hover:bg-italian-green-50"
+                      className="w-12 h-12 rounded-full border-italian-green-300 hover:bg-italian-green-50"
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -184,9 +206,9 @@ const FoodDetail: React.FC = () => {
                 </div>
 
                 {/* Total Price */}
-                <div className="mb-8 p-4 bg-italian-cream-100 rounded-lg border border-italian-cream-200">
+                <div className="p-4 bg-italian-cream-100 rounded-lg border border-italian-cream-200">
                   <div className="flex justify-between items-center">
-                    <span className="text-lg font-medium text-italian-green-800">Totale:</span>
+                    <span className="text-lg font-medium text-italian-green-800">Total:</span>
                     <span className="text-2xl font-bold text-italian-green-700">
                       €{(food.price * quantity).toFixed(2)}
                     </span>
@@ -197,28 +219,30 @@ const FoodDetail: React.FC = () => {
                 {user?.role === 'user' ? (
                   <Button
                     onClick={handleAddToCart}
-                    className="w-full btn-gradient text-white py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl"
+                    className="w-full btn-gradient text-white py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
                   >
                     <Plus className="h-5 w-5 mr-2" />
-                    Aggiungi al Carrello
+                    Add to Cart
                   </Button>
                 ) : (
-                  <div className="w-full p-4 bg-italian-cream-100 rounded-xl border border-italian-cream-200 text-center">
-                    <p className="text-italian-green-700 font-medium">
-                      {user?.role === 'admin' ? 'Admins cannot place orders' : 'Delivery personnel cannot place orders'}
-                    </p>
-                    <p className="text-sm text-italian-green-600 mt-1">
-                      Only customers can add items to cart and place orders
-                    </p>
-                  </div>
+                  <Button
+                    onClick={handleAddToCart}
+                    className="w-full btn-gradient text-white py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add to Cart
+                  </Button>
                 )}
 
                 {!isAuthenticated && (
-                  <p className="text-sm text-italian-green-600 text-center mt-4">
-                    Please <span className="text-italian-green-700 font-medium">login</span> to join our famiglia and order
-                  </p>
+                  <Button
+                    onClick={() => navigate('/login')}
+                    className="w-full btn-gradient text-white py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                  >
+                    Login to Order
+                  </Button>
                 )}
-              </CardContent>
+              </div>
             </Card>
           </div>
         </div>

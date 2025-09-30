@@ -114,21 +114,41 @@ const Home: React.FC = () => {
       {/* Food Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         {filteredFoods.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredFoods.map((food, index) => (
-              <div key={food._id} className="animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+              <div 
+                key={food._id} 
+                className="card-entrance transform hover:scale-105 transition-all duration-500" 
+                style={{ 
+                  animationDelay: `${index * 0.15}s`,
+                  animationFillMode: 'both'
+                }}
+              >
                 <FoodCard food={food} />
               </div>
             ))}
           </div>
         ) : (
-          <Card className="p-8 text-center card-warm">
-            <div className="text-gray-600">
-              <span className="text-4xl mb-4 block">🔍</span>
-              <h3 className="text-lg font-medium mb-2">Nessun piatto trovato</h3>
-              <p>Try adjusting your search or category filter</p>
-            </div>
-          </Card>
+          <div className="flex justify-center">
+            <Card className="p-12 text-center card-warm max-w-md mx-auto animate-scale-in">
+              <div className="text-gray-600">
+                <div className="w-20 h-20 bg-gradient-to-br from-italian-green-100 to-italian-cream-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                  <span className="text-4xl">🔍</span>
+                </div>
+                <h3 className="text-xl font-semibold mb-3 text-gray-800">Nessun piatto trovato</h3>
+                <p className="text-gray-600 mb-6">Try adjusting your search or category filter</p>
+                <Button 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedCategory('All');
+                  }}
+                  className="btn-gradient text-white px-6 py-2 rounded-full"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </Card>
+          </div>
         )}
       </div>
 

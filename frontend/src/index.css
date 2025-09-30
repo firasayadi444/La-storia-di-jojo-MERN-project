@@ -134,4 +134,283 @@
     background-image: radial-gradient(circle at 1px 1px, rgba(0, 122, 77, 0.1) 1px, transparent 0);
     background-size: 20px 20px;
   }
+
+  /* Animations personnalisées pour les pages d'authentification */
+  .animate-scale-in {
+    animation: scaleIn 0.6s ease-out;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 6s ease-in-out infinite 2s;
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.8s ease-out;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 1s ease-out;
+  }
+
+  /* Effet de particules flottantes */
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: particleFloat 8s linear infinite;
+  }
+
+  .particle:nth-child(1) { animation-delay: 0s; }
+  .particle:nth-child(2) { animation-delay: 2s; }
+  .particle:nth-child(3) { animation-delay: 4s; }
+  .particle:nth-child(4) { animation-delay: 6s; }
+  .particle:nth-child(5) { animation-delay: 1s; }
+
+  /* Effet de glassmorphism amélioré */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  }
+
+  .glass-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.5);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.4);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes particleFloat {
+  0% {
+    transform: translateY(100vh) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* Animations pour les cartes de nourriture */
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 122, 77, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(0, 122, 77, 0.6);
+  }
+}
+
+@keyframes bounceGentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Classes utilitaires pour les cartes */
+.card-entrance {
+  animation: cardEntrance 0.6s ease-out forwards;
+}
+
+.shimmer-effect {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+.bounce-gentle {
+  animation: bounceGentle 2s ease-in-out infinite;
+}
+
+/* Effet de parallaxe pour les cartes */
+.card-parallax {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease-out;
+}
+
+.card-parallax:hover {
+  transform: translateZ(20px) rotateX(5deg) rotateY(5deg);
+}
+
+/* Effet de glassmorphism pour les cartes */
+.glass-card-food {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 8px 32px 0 rgba(31, 38, 135, 0.37),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.glass-card-food:hover {
+  background: rgba(255, 255, 255, 0.98);
+  transform: translateY(-8px);
+  box-shadow: 
+    0 20px 40px 0 rgba(31, 38, 135, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Animations pour la page de recette */
+.recipe-hero {
+  background: linear-gradient(135deg, rgba(0, 122, 77, 0.1) 0%, rgba(255, 248, 240, 0.1) 100%);
+  backdrop-filter: blur(10px);
+}
+
+.recipe-card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.recipe-card-hover:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(0, 122, 77, 0.15);
+}
+
+.recipe-badge {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 122, 77, 0.1);
+}
+
+.recipe-stats-card {
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, rgba(255, 248, 240, 0.8) 0%, rgba(255, 248, 240, 0.4) 100%);
+}
+
+.recipe-stats-card:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(255, 248, 240, 0.9) 0%, rgba(255, 248, 240, 0.6) 100%);
+  box-shadow: 0 10px 25px rgba(0, 122, 77, 0.1);
+}
+
+.recipe-action-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(20px);
+}
+
+.recipe-action-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.recipe-favorite-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.recipe-favorite-btn:hover {
+  transform: scale(1.15);
+}
+
+.recipe-favorite-btn.favorited {
+  animation: heartBeat 0.6s ease-in-out;
+}
+
+@keyframes heartBeat {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.2); }
+  50% { transform: scale(1.1); }
+  75% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.recipe-price-glow {
+  background: linear-gradient(135deg, #007a4d 0%, #00a86b 100%);
+  box-shadow: 0 0 20px rgba(0, 122, 77, 0.3);
+  animation: priceGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes priceGlow {
+  from { box-shadow: 0 0 20px rgba(0, 122, 77, 0.3); }
+  to { box-shadow: 0 0 30px rgba(0, 122, 77, 0.5); }
 }

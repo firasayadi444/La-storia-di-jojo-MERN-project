@@ -1,0 +1,137 @@
+@startuml Test Class Structure
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classStyle rectangle
+
+title Structure des Classes de Test - Architecture de Test
+
+package "Frontend Test Structure" {
+    class VitestConfig {
+        + environment: jsdom
+        + setupFiles: setup.ts
+        + coverage: v8
+        + globals: true
+    }
+    
+    class TestSetup {
+        + mockIntersectionObserver()
+        + mockResizeObserver()
+        + mockMatchMedia()
+        + mockLocalStorage()
+        + mockFetch()
+    }
+    
+    class ComponentTest {
+        + render(component)
+        + simulateUserInteraction()
+        + assertDOMStructure()
+        + verifyStateChanges()
+    }
+    
+    class APIMock {
+        + mockGetRequest()
+        + mockPostRequest()
+        + mockErrorResponse()
+        + mockLoadingState()
+    }
+    
+    class UserOrdersHistoryTest {
+        + testOrderDisplay()
+        + testOrderFiltering()
+        + testOrderStatusUpdate()
+        + testErrorHandling()
+    }
+}
+
+package "Backend Test Structure" {
+    class JestConfig {
+        + testEnvironment: node
+        + setupFilesAfterEnv: setup.js
+        + collectCoverageFrom: controllers, models, routes
+        + testTimeout: 30000
+    }
+    
+    class TestSetup {
+        + connectMongoMemoryServer()
+        + generateTestToken()
+        + mockFileUpload()
+        + cleanupDatabase()
+    }
+    
+    class AuthTestSuite {
+        + testUserRegistration()
+        + testUserLogin()
+        + testPasswordChange()
+        + testJWTValidation()
+    }
+    
+    class FoodTestSuite {
+        + testFoodCRUD()
+        + testFileUpload()
+        + testAdminAuthorization()
+        + testValidation()
+    }
+    
+    class OrderTestSuite {
+        + testOrderCreation()
+        + testStatusUpdates()
+        + testDeliveryAssignment()
+        + testPaymentProcessing()
+    }
+    
+    class DeliveryTestSuite {
+        + testApplicationProcess()
+        + testApprovalWorkflow()
+        + testAvailabilityManagement()
+        + testRoleBasedAccess()
+    }
+}
+
+package "Test Utilities" {
+    class TestHelpers {
+        + createTestUser()
+        + generateJWTToken()
+        + mockFileUpload()
+        + cleanupTestData()
+    }
+    
+    class DatabaseUtils {
+        + connectTestDB()
+        + clearCollections()
+        + seedTestData()
+        + disconnectTestDB()
+    }
+    
+    class APITestUtils {
+        + makeAuthenticatedRequest()
+        + assertResponseStructure()
+        + validateErrorResponse()
+        + checkAuthorization()
+    }
+}
+
+' Relationships
+VitestConfig --> TestSetup : configures
+TestSetup --> ComponentTest : provides mocks
+ComponentTest --> UserOrdersHistoryTest : extends
+APIMock --> UserOrdersHistoryTest : used by
+
+JestConfig --> TestSetup : configures
+TestSetup --> AuthTestSuite : provides setup
+TestSetup --> FoodTestSuite : provides setup
+TestSetup --> OrderTestSuite : provides setup
+TestSetup --> DeliveryTestSuite : provides setup
+
+TestHelpers --> AuthTestSuite : used by
+TestHelpers --> FoodTestSuite : used by
+TestHelpers --> OrderTestSuite : used by
+TestHelpers --> DeliveryTestSuite : used by
+
+DatabaseUtils --> TestSetup : manages
+APITestUtils --> AuthTestSuite : used by
+APITestUtils --> FoodTestSuite : used by
+APITestUtils --> OrderTestSuite : used by
+APITestUtils --> DeliveryTestSuite : used by
+
+@enduml

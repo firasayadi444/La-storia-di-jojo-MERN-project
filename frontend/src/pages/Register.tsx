@@ -126,23 +126,43 @@ const Register: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-food-teal-50 to-food-orange-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md animate-scale-in">
-        <Card className="shadow-xl border-0 bg-white/95 backdrop-blur-sm">
-          <CardHeader className="text-center pb-6">
-            <div className="w-16 h-16 bg-gradient-secondary rounded-full flex items-center justify-center mx-auto mb-4">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{
+        backgroundImage: 'url(/background.jpg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      {/* Overlay pour améliorer la lisibilité */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"></div>
+      
+      {/* Effet de particules flottantes améliorées */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="particle absolute top-1/4 left-1/4 w-2 h-2 bg-white/30"></div>
+        <div className="particle absolute top-1/3 right-1/3 w-1 h-1 bg-white/40"></div>
+        <div className="particle absolute bottom-1/4 left-1/3 w-1.5 h-1.5 bg-white/20"></div>
+        <div className="particle absolute bottom-1/3 right-1/4 w-1 h-1 bg-white/30"></div>
+        <div className="particle absolute top-1/2 left-1/2 w-1 h-1 bg-white/25"></div>
+      </div>
+      
+      <div className="w-full max-w-md animate-scale-in relative z-10">
+        <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md ring-1 ring-white/20 animate-glow">
+          <CardHeader className="text-center pb-6 animate-slide-up">
+            <div className="w-16 h-16 bg-gradient-secondary rounded-full flex items-center justify-center mx-auto mb-4 animate-float">
               <span className="text-white font-bold text-2xl">F</span>
             </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Join FoodieDelight</CardTitle>
-            <CardDescription className="text-gray-600">
+            <CardTitle className="text-2xl font-bold text-gray-900 animate-fade-in">Join FoodieDelight</CardTitle>
+            <CardDescription className="text-gray-700 animate-fade-in">
               Create your account to start ordering delicious food
             </CardDescription>
           </CardHeader>
           
           <CardContent>
             <div className="mb-4 flex items-center gap-2">
-              <input type="checkbox" id="isDeliveryMan" checked={isDeliveryMan} onChange={e => setIsDeliveryMan(e.target.checked)} />
-              <Label htmlFor="isDeliveryMan">Apply as Delivery Man</Label>
+              <input type="checkbox" id="isDeliveryMan" checked={isDeliveryMan} onChange={e => setIsDeliveryMan(e.target.checked)} className="w-4 h-4" />
+              <Label htmlFor="isDeliveryMan" className="text-sm font-semibold text-gray-800">Apply as Delivery Man</Label>
             </div>
             {isDeliveryMan ? (
               submitted ? (
@@ -150,32 +170,32 @@ const Register: React.FC = () => {
               ) : (
                 <form onSubmit={handleDeliveryManSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" name="name" type="text" value={formData.name} onChange={handleChange} required />
+                    <Label htmlFor="name" className="text-sm font-semibold text-gray-800">Full Name</Label>
+                    <Input id="name" name="name" type="text" value={formData.name} onChange={handleChange} required className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} required />
+                    <Label htmlFor="email" className="text-sm font-semibold text-gray-800">Email Address</Label>
+                    <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} required className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input id="phone" name="phone" type="text" value={formData.phone} onChange={handleChange} required />
+                    <Label htmlFor="phone" className="text-sm font-semibold text-gray-800">Phone</Label>
+                    <Input id="phone" name="phone" type="text" value={formData.phone} onChange={handleChange} required className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="vehicleType">Vehicle Type (bike/car) - Optional</Label>
-                    <Input id="vehicleType" name="vehicleType" type="text" value={formData.vehicleType} onChange={handleChange} />
+                    <Label htmlFor="vehicleType" className="text-sm font-semibold text-gray-800">Vehicle Type (bike/car) - Optional</Label>
+                    <Input id="vehicleType" name="vehicleType" type="text" value={formData.vehicleType} onChange={handleChange} className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Vehicle Photo - Optional</Label>
-                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, vehiclePhoto: e.target.files?.[0] || null }))} />
+                    <Label className="text-sm font-semibold text-gray-800">Vehicle Photo - Optional</Label>
+                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, vehiclePhoto: e.target.files?.[0] || null }))} className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Face Photo - Optional</Label>
-                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, facePhoto: e.target.files?.[0] || null }))} />
+                    <Label className="text-sm font-semibold text-gray-800">Face Photo - Optional</Label>
+                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, facePhoto: e.target.files?.[0] || null }))} className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900" />
                   </div>
                   <div className="space-y-2">
-                    <Label>CIN Card Photo - Optional</Label>
-                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, cinPhoto: e.target.files?.[0] || null }))} />
+                    <Label className="text-sm font-semibold text-gray-800">CIN Card Photo - Optional</Label>
+                    <Input type="file" accept="image/*" onChange={e => setFormData(prev => ({ ...prev, cinPhoto: e.target.files?.[0] || null }))} className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900" />
                   </div>
                   <Button type="submit" className="w-full btn-gradient text-white py-3 text-lg font-semibold mt-6">Submit Application</Button>
                 </form>
@@ -183,7 +203,7 @@ const Register: React.FC = () => {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="name" className="text-sm font-semibold text-gray-800">
                     Full Name
                   </Label>
                   <Input
@@ -194,12 +214,12 @@ const Register: React.FC = () => {
                     onChange={handleChange}
                     placeholder="Enter your full name"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-transparent"
+                    className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="email" className="text-sm font-semibold text-gray-800">
                     Email Address
                   </Label>
                   <Input
@@ -210,12 +230,12 @@ const Register: React.FC = () => {
                     onChange={handleChange}
                     placeholder="Enter your email"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-transparent"
+                    className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="password" className="text-sm font-semibold text-gray-800">
                     Password
                   </Label>
                   <Input
@@ -226,12 +246,12 @@ const Register: React.FC = () => {
                     onChange={handleChange}
                     placeholder="Create a password"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-transparent"
+                    className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="confirmPassword" className="text-sm font-semibold text-gray-800">
                     Confirm Password
                   </Label>
                   <Input
@@ -242,12 +262,12 @@ const Register: React.FC = () => {
                     onChange={handleChange}
                     placeholder="Confirm your password"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-transparent"
+                    className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="address" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="address" className="text-sm font-semibold text-gray-800">
                     Address (Optional)
                   </Label>
                   <Input
@@ -257,7 +277,7 @@ const Register: React.FC = () => {
                     value={formData.address}
                     onChange={handleChange}
                     placeholder="Enter your delivery address"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-transparent"
+                    className="w-full px-3 py-3 border-2 border-gray-300 rounded-md focus:ring-2 focus:ring-food-teal-500 focus:border-food-teal-500 bg-white/90 text-gray-900 placeholder-gray-500"
                   />
                 </div>
                 
@@ -272,9 +292,9 @@ const Register: React.FC = () => {
             )}
             
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-800">
                 Already have an account?{' '}
-                <Link to="/login" className="text-food-teal-600 hover:text-food-teal-700 font-medium">
+                <Link to="/login" className="text-food-teal-600 hover:text-food-teal-700 font-semibold underline">
                   Sign in here
                 </Link>
               </p>

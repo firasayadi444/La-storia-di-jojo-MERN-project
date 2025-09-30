@@ -290,17 +290,17 @@ const Navbar: React.FC = () => {
                 <DropdownMenuContent align="end" className="w-48 bg-white border shadow-lg">
                   {user?.role === 'delivery' && (
                     <DropdownMenuItem asChild>
-                      <Link to="/dashboard" className="flex items-center space-x-2 px-3 py-2">
-                        <User className="h-4 w-4" />
-                        <span>Dashboard</span>
+                      <Link to="/delivery" className="flex items-center space-x-2 px-3 py-2">
+                        <Truck className="h-4 w-4" />
+                        <span>Delivery Management</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
                   {user?.role === 'delivery' && (
                     <DropdownMenuItem asChild>
-                      <Link to="/delivery" className="flex items-center space-x-2 px-3 py-2">
-                        <Truck className="h-4 w-4" />
-                        <span>Delivery Management</span>
+                      <Link to="/profile" className="flex items-center space-x-2 px-3 py-2">
+                        <User className="h-4 w-4" />
+                        <span>Profile</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
