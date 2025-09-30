@@ -249,11 +249,19 @@ const orderController = {
         .populate('payment')
         .sort({ createdAt: -1 });
       
+      // Filter out orders that have null food references (deleted food items)
+      const validOrders = orders.filter(order => 
+        order.items.every(item => item.food !== null)
+      );
+      
+      console.log('📊 getAllOrders: Found orders:', orders.length);
+      console.log('📊 getAllOrders: Valid orders (no deleted food):', validOrders.length);
+      console.log('📊 getAllOrders: Filtered out orders with deleted food:', orders.length - validOrders.length);
       
       res.status(200).json({ 
         message: "Orders retrieved successfully",
-        data: orders,
-        orders: orders // Keep both for backward compatibility
+        data: validOrders,
+        orders: validOrders // Keep both for backward compatibility
       });
     } catch (error) {
       console.error('Error in getAllOrders:', error); // Debug log
@@ -270,15 +278,16 @@ const orderController = {
         .populate('payment')
         .sort({ createdAt: -1 });
       
-      console.log('📊 getUserOrders: Found orders:', orders.length);
-      console.log('📊 getUserOrders: First order payment data:', orders[0] ? {
-        orderId: orders[0]._id,
-        payment: orders[0].payment,
-        paymentStatus: orders[0].payment?.paymentStatus,
-        paymentMethod: orders[0].payment?.paymentMethod
-      } : 'No orders');
+      // Filter out orders that have null food references (deleted food items)
+      const validOrders = orders.filter(order => 
+        order.items.every(item => item.food !== null)
+      );
       
-      res.status(200).json({ orders });
+      console.log('📊 getUserOrders: Found orders:', orders.length);
+      console.log('📊 getUserOrders: Valid orders (no deleted food):', validOrders.length);
+      console.log('📊 getUserOrders: Filtered out orders with deleted food:', orders.length - validOrders.length);
+      
+      res.status(200).json({ orders: validOrders });
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }
@@ -347,7 +356,12 @@ const orderController = {
         .populate('payment')
         .sort({ createdAt: -1 });
       
-      res.status(200).json({ orders });
+      // Filter out orders that have null food references (deleted food items)
+      const validOrders = orders.filter(order => 
+        order.items.every(item => item.food !== null)
+      );
+      
+      res.status(200).json({ orders: validOrders });
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }

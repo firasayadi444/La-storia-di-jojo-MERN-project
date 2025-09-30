@@ -11,7 +11,6 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useSocket } from '../contexts/SocketContext';
 import DeliveryStatusUpdater from '../components/DeliveryStatusUpdater';
-import DeliveryTrajectoryMap from '../components/DeliveryTrajectoryMap';
 import { 
   MapPin, 
   Clock, 
@@ -391,14 +390,6 @@ const DeliveryDashboard: React.FC = () => {
                           <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
                           <div className="flex-1">
                             <span className="text-sm text-gray-600">{order.deliveryAddress}</span>
-                            {(order as any).customerLocation && (order as any).customerLocation.latitude && (order as any).customerLocation.longitude && (
-                              <div className="mt-1 text-xs text-blue-600">
-                                📍 Customer Location: {(order as any).customerLocation.latitude.toFixed(6)}, {(order as any).customerLocation.longitude.toFixed(6)}
-                                {(order as any).customerLocation.accuracy && (
-                                  <span className="ml-2 text-gray-500">(±{Math.round((order as any).customerLocation.accuracy)}m)</span>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -514,20 +505,13 @@ const DeliveryDashboard: React.FC = () => {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Delivery</h3>
                   {activeOrders.map((order) => (
-                    <DeliveryTrajectoryMap
-                      key={order._id}
-                      orderId={order._id}
-                      deliveryManId={user._id}
-                      deliveryAddress={order.deliveryAddress}
-                      deliveryAddressCoords={{
-                        lat: 40.7589, // This would come from geocoding the address
-                        lng: -73.9851
-                      }}
-                      customerLocation={order.customerLocation}
-                      onLocationUpdate={(location) => {
-                        console.log('Location update for order:', order._id, location);
-                      }}
-                    />
+                    <Card key={order._id} className="p-4">
+                      <div className="text-center py-4 text-gray-500">
+                        <MapPin className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        <p>Delivery map temporarily unavailable</p>
+                        <p className="text-sm">Order #{order._id.slice(-6)}</p>
+                      </div>
+                    </Card>
                   ))}
                 </div>
               )}
@@ -536,19 +520,13 @@ const DeliveryDashboard: React.FC = () => {
               {completedOrders.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Delivery</h3>
-                  <DeliveryTrajectoryMap
-                    orderId={completedOrders[0]._id}
-                    deliveryManId={user._id}
-                    deliveryAddress={completedOrders[0].deliveryAddress}
-                    deliveryAddressCoords={{
-                      lat: 40.7589, // This would come from geocoding the address
-                      lng: -73.9851
-                    }}
-                    customerLocation={completedOrders[0].customerLocation}
-                    onLocationUpdate={(location) => {
-                      console.log('Location update for completed order:', completedOrders[0]._id, location);
-                    }}
-                  />
+                  <Card className="p-4">
+                    <div className="text-center py-4 text-gray-500">
+                      <MapPin className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                      <p>Delivery map temporarily unavailable</p>
+                      <p className="text-sm">Order #{completedOrders[0]._id.slice(-6)}</p>
+                    </div>
+                  </Card>
                 </div>
               )}
             </div>

@@ -164,25 +164,46 @@ const UserOrdersHistory: React.FC = () => {
                       <div className="mb-4 bg-gray-50 rounded-lg p-3">
                         <h4 className="font-semibold text-gray-700 mb-2">Items</h4>
                         <div className="space-y-2">
-                          {order.items.map((item, index) => (
-                            <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0 hover:bg-gray-100 rounded-md transition-colors">
-                              <div className="flex items-center space-x-3">
-                                <img
-                                  src={item.food.image}
-                                  alt={item.food.name}
-                                  className="w-12 h-12 object-cover rounded-lg"
-                                  onError={(e) => {
-                                    e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=48&h=48&fit=crop`;
-                                  }}
-                                />
-                                <div>
-                                  <p className="font-medium text-gray-800">{item.food.name}</p>
-                                  <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                          {order.items.map((item, index) => {
+                            // Add null check for item.food
+                            if (!item.food) {
+                              console.warn('Food data is null for item:', item);
+                              return (
+                                <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0 hover:bg-gray-100 rounded-md transition-colors">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                      <span className="text-gray-400 text-xs">N/A</span>
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-gray-800">Food item unavailable</p>
+                                      <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                                    </div>
+                                  </div>
+                                  <p className="font-semibold text-gray-700">€{item.price.toFixed(2)}</p>
                                 </div>
+                              );
+                            }
+                            
+                            return (
+                              <div key={index} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0 hover:bg-gray-100 rounded-md transition-colors">
+                                <div className="flex items-center space-x-3">
+                                  <img
+                                    src={item.food.image}
+                                    alt={item.food.name}
+                                    className="w-12 h-12 object-cover rounded-lg"
+                                    onError={(e) => {
+                                      e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=48&h=48&fit=crop`;
+                                    }}
+                                  />
+                                  <div>
+                                    <p className="font-medium text-gray-800">{item.food.name}</p>
+                                    <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                                  </div>
+                                </div>
+                                <p className="font-semibold text-gray-700">€{item.price.toFixed(2)}</p>
                               </div>
-                              <p className="font-semibold text-gray-700">€{item.price.toFixed(2)}</p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                       {/* Order Details */}

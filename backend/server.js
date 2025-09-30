@@ -121,9 +121,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 app.use("/api/deliveryman", require("./routes/deliverymanRoute"));
 app.use("/api/payment", require("./routes/paymentRoute"));
-app.use("/api/location", require("./routes/locationRoute"));
 app.use("/api/delivery-history", require("./routes/deliveryHistoryRoute"));
-app.use("/api/delivery", require("./routes/deliveryTrackingRoute"));
 
 if (process.env.NODE_ENV !== 'test') {
   console.log('All routes mounted successfully');

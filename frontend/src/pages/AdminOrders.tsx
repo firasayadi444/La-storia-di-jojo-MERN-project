@@ -287,39 +287,6 @@ const AdminOrders: React.FC = () => {
                   </span>
                 </div>
               </div>
-              {(order as any).customerLocation && (
-                <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MapPin className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium text-blue-900 text-sm">Customer GPS Location</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-gray-600">Coordinates:</span>
-                      <span className="font-mono text-blue-800 ml-2">
-                        {(order as any).customerLocation.latitude && (order as any).customerLocation.longitude ? 
-                          `${(order as any).customerLocation.latitude.toFixed(6)}, ${(order as any).customerLocation.longitude.toFixed(6)}` :
-                          'Location not available'
-                        }
-                      </span>
-                    </div>
-                    {(order as any).customerLocation.accuracy && (
-                      <div>
-                        <span className="text-gray-600">Accuracy:</span>
-                        <span className="text-blue-800 ml-2">±{Math.round((order as any).customerLocation.accuracy)}m</span>
-                      </div>
-                    )}
-                    {(order as any).customerLocation.timestamp && (
-                      <div className="md:col-span-2">
-                        <span className="text-gray-600">Captured:</span>
-                        <span className="text-blue-800 ml-2">
-                          {new Date((order as any).customerLocation.timestamp).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
               <div className="mt-3 text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />

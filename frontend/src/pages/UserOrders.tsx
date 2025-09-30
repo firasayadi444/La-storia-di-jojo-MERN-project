@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X, RefreshCw, Navigation } from 'lucide-react';
+import { Clock, CheckCircle, Truck, Star, MessageSquare, Eye, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService, Order } from '../services/api';
 import { Button } from '@/components/ui/button';
@@ -289,25 +289,46 @@ const UserOrders: React.FC = () => {
                   <div className="mb-4">
                     <h4 className="font-semibold text-italian-green-800 mb-2">Items:</h4>
                     <div className="space-y-2">
-                      {order.items.map((item, index) => (
-                        <div key={index} className="flex justify-between items-center py-2 border-b border-italian-cream-200 last:border-b-0">
-                          <div className="flex items-center space-x-3">
-                            <img
-                              src={item.food.image}
-                              alt={item.food.name}
-                              className="w-12 h-12 object-cover rounded-lg"
-                              onError={(e) => {
-                                e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=48&h=48&fit=crop`;
-                              }}
-                            />
-                            <div>
-                              <p className="font-medium text-italian-green-800">{item.food.name}</p>
-                              <p className="text-sm text-italian-green-600">Qty: {item.quantity}</p>
+                      {order.items.map((item, index) => {
+                        // Add null check for item.food
+                        if (!item.food) {
+                          console.warn('Food data is null for item:', item);
+                          return (
+                            <div key={index} className="flex justify-between items-center py-2 border-b border-italian-cream-200 last:border-b-0">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                  <span className="text-gray-400 text-xs">N/A</span>
+                                </div>
+                                <div>
+                                  <p className="font-medium text-italian-green-800">Food item unavailable</p>
+                                  <p className="text-sm text-italian-green-600">Qty: {item.quantity}</p>
+                                </div>
+                              </div>
+                              <p className="font-semibold text-italian-green-700">€{item.price.toFixed(2)}</p>
                             </div>
+                          );
+                        }
+                        
+                        return (
+                          <div key={index} className="flex justify-between items-center py-2 border-b border-italian-cream-200 last:border-b-0">
+                            <div className="flex items-center space-x-3">
+                              <img
+                                src={item.food.image}
+                                alt={item.food.name}
+                                className="w-12 h-12 object-cover rounded-lg"
+                                onError={(e) => {
+                                  e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=48&h=48&fit=crop`;
+                                }}
+                              />
+                              <div>
+                                <p className="font-medium text-italian-green-800">{item.food.name}</p>
+                                <p className="text-sm text-italian-green-600">Qty: {item.quantity}</p>
+                              </div>
+                            </div>
+                            <p className="font-semibold text-italian-green-700">€{item.price.toFixed(2)}</p>
                           </div>
-                          <p className="font-semibold text-italian-green-700">€{item.price.toFixed(2)}</p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -387,18 +408,6 @@ const UserOrders: React.FC = () => {
 
                   {/* Action Buttons */}
                   <div className="flex justify-end space-x-2 pt-4 border-t border-italian-cream-200">
-                    {/* Track Delivery Button for Active Orders */}
-                    {['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/track-delivery/${order._id}`)}
-                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-                      >
-                        <Navigation className="h-4 w-4 mr-2" />
-                        Track Delivery
-                      </Button>
-                    )}
 
                     {/* Cancel Button for Pending Orders */}
                     {order.status === 'pending' && (
