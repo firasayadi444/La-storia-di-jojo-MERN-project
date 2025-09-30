@@ -10,7 +10,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useSocket } from '../contexts/SocketContext';
-import DeliveryStatusUpdater from '../components/DeliveryStatusUpdater';
 import { 
   MapPin, 
   Clock, 
@@ -609,21 +608,35 @@ const DeliveryDashboard: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delivery Status Updater Dialog */}
+      {/* Delivery Tracking Dialog - Simplified */}
       <Dialog open={!!selectedOrderForTracking} onOpenChange={() => setSelectedOrderForTracking(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Delivery Tracking & Status Update</DialogTitle>
+            <DialogTitle>Delivery Tracking</DialogTitle>
           </DialogHeader>
           {selectedOrderForTracking && (
-            <DeliveryStatusUpdater
-              order={selectedOrderForTracking as any}
-              onStatusUpdate={(newStatus) => {
-                // Refresh orders when status is updated
-                fetchData(true);
-                setSelectedOrderForTracking(null);
-              }}
-            />
+            <div className="space-y-4">
+              <div className="text-center py-8">
+                <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Order #{selectedOrderForTracking._id.slice(-6)}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Delivery tracking feature is temporarily unavailable.
+                </p>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    <strong>Customer:</strong> {selectedOrderForTracking.user?.name}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Address:</strong> {selectedOrderForTracking.deliveryAddress}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Status:</strong> {selectedOrderForTracking.status.replace('_', ' ')}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
