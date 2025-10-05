@@ -31,7 +31,15 @@ import {
   Moon,
   Sun,
   Cloud,
-  Rainbow
+  Rainbow,
+  Eye,
+  EyeOff,
+  Save,
+  Trash2,
+  Plus,
+  AlertTriangle,
+  CheckCircle2,
+  Info
 } from 'lucide-react';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder_key');
@@ -59,6 +67,10 @@ const PaymentForm: React.FC<ModernPaymentModalProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [showParticles, setShowParticles] = useState(false);
+  const [saveCard, setSaveCard] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [isCardComplete, setIsCardComplete] = useState(false);
+  const [showSecurityInfo, setShowSecurityInfo] = useState(false);
 
   // Particle animation for success state
   useEffect(() => {

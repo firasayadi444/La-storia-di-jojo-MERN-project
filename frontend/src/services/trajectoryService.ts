@@ -191,3 +191,4 @@ class TrajectoryService {
 
 // Export singleton instance
 export const trajectoryService = new TrajectoryService();
+

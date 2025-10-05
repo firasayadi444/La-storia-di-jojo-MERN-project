@@ -523,7 +523,7 @@ class ApiService {
   }
 
   // Profile and address management
-  async updateProfile(profile: { name: string; email: string; phone: string }) {
+  async updateProfile(profile: { name: string; email: string; phone: string; address: string }) {
     const token = getAuthToken();
     if (!token) throw new Error('Authentication required');
     const response = await fetch(`${this.baseURL}/user/profile`, {
