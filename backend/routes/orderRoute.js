@@ -11,6 +11,7 @@ router.get("/test", (req, res) => {
 // Order management routes
 router.post("/order/new", authMiddleware, orderController.makeOrder);
 router.get("/orders", adminAuthMiddleware, orderController.getAllOrders);
+router.get("/orders/:id/details", adminAuthMiddleware, orderController.getOrderDetails);
 router.get("/orders/user", authMiddleware, orderController.getUserOrders);
 router.get("/orders/delivery", authMiddleware, orderController.getDeliveryOrders);
 router.get("/orders/:id/customer-location", authMiddleware, orderController.getOrderCustomerLocation);

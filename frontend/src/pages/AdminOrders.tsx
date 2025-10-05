@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, User as UserIcon, Truck, Package, CheckCircle, XCircle, AlertCircle, RefreshCw, MapPin } from 'lucide-react';
+import { Clock, User as UserIcon, Truck, Package, CheckCircle, XCircle, AlertCircle, RefreshCw, MapPin, Eye } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
+import OrderDetailsModal from '@/components/OrderDetailsModal';
 
 const statusOptions = [
   'pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'
@@ -40,6 +41,8 @@ const AdminOrders: React.FC = () => {
     deliveryNotes: ''
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<string | null>(null);
   const { registerRefreshCallback, unregisterRefreshCallback } = useSocket();
 
   const fetchOrders = async (showRefreshIndicator = false) => {
@@ -157,6 +160,11 @@ const AdminOrders: React.FC = () => {
       deliveryNotes: ''
     });
     setIsDialogOpen(true);
+  };
+
+  const openDetailsModal = (orderId: string) => {
+    setSelectedOrderForDetails(orderId);
+    setIsDetailsModalOpen(true);
   };
 
   const handleUpdateOrder = async () => {
@@ -295,6 +303,15 @@ const AdminOrders: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button
+                onClick={() => openDetailsModal(order._id)}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Eye className="h-4 w-4" />
+                Détails
+              </Button>
               <Button
                 onClick={() => openUpdateDialog(order)}
                 disabled={updating === order._id}
@@ -548,6 +565,16 @@ const AdminOrders: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedOrderForDetails(null);
+        }}
+        orderId={selectedOrderForDetails || ''}
+      />
     </div>
   );
 };

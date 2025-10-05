@@ -423,6 +423,17 @@ class ApiService {
     return handleResponse<Order>(response);
   }
 
+  async getOrderDetails(orderId: string): Promise<ApiResponse<Order>> {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/orders/${orderId}/details`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<Order>(response);
+  }
+
   async getPendingDeliveryMen(): Promise<ApiResponse<User[]>> {
     const token = getAuthToken();
     if (!token) throw new Error('Authentication required');

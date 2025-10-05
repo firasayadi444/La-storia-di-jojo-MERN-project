@@ -596,6 +596,39 @@ const orderController = {
     }
   },
 
+  // Get detailed order information for admin
+  getOrderDetails: async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const order = await Orders.findById(id)
+        .populate('user', 'name email phone')
+        .populate('items.food', 'name price image category description')
+        .populate('deliveryMan', 'name phone email vehicleType currentLocation')
+        .populate('payment', 'paymentMethod paymentStatus paidAt');
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      // Filter out items with deleted food references
+      const validItems = order.items.filter(item => item.food !== null);
+      
+      const orderDetails = {
+        ...order.toObject(),
+        items: validItems
+      };
+      
+      res.status(200).json({
+        message: "Order details retrieved successfully",
+        data: orderDetails
+      });
+    } catch (error) {
+      console.error('Error in getOrderDetails:', error);
+      return res.status(500).json({ message: error.message });
+    }
+  },
+
   submitFeedback: async (req, res) => {
     try {
       const orderId = req.params.id;

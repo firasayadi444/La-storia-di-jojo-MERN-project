@@ -2,11 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { apiService, Order, User } from '../services/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, User as UserIcon, Truck, Inbox, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Clock, User as UserIcon, Truck, Inbox, CheckCircle, Eye } from 'lucide-react';
+import OrderDetailsModal from '@/components/OrderDetailsModal';
 
 const AdminOrdersHistory: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<string | null>(null);
 
   const fetchOrderHistory = async () => {
     setLoading(true);
@@ -24,6 +28,11 @@ const AdminOrdersHistory: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openDetailsModal = (orderId: string) => {
+    setSelectedOrderForDetails(orderId);
+    setIsDetailsModalOpen(true);
   };
 
   useEffect(() => {
@@ -113,6 +122,17 @@ const AdminOrdersHistory: React.FC = () => {
                           {new Date(order.createdAt).toLocaleString()}
                         </div>
                       </div>
+                      <div className="mt-4">
+                        <Button
+                          onClick={() => openDetailsModal(order._id)}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Voir Détails
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -130,6 +150,16 @@ const AdminOrdersHistory: React.FC = () => {
           </Card>
         )}
       </div>
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedOrderForDetails(null);
+        }}
+        orderId={selectedOrderForDetails || ''}
+      />
     </div>
   );
 };
