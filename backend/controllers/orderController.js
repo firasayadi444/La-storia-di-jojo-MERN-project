@@ -98,12 +98,8 @@ const orderController = {
       } else {
       }
 
-      // Try to automatically assign the nearest delivery person
-      try {
-        await orderController.autoAssignDeliveryPerson(order._id);
-      } catch (assignError) {
-        console.log('Auto-assignment failed, order will be assigned manually:', assignError.message);
-      }
+      // Auto-assignment disabled - orders will be assigned manually by admin
+      console.log('📋 Order created. Admin will assign delivery person manually.');
 
       res.status(201).json({
         message: "Order placed successfully",
@@ -114,76 +110,6 @@ const orderController = {
     }
   },
 
-  // Auto-assign the nearest available delivery person
-  autoAssignDeliveryPerson: async (orderId) => {
-    try {
-      const order = await Orders.findById(orderId).populate('user', 'name email phone');
-      if (!order) {
-        throw new Error('Order not found');
-      }
-
-      // Get all available delivery persons with location data
-      const availableDeliveryPersons = await Users.find({
-        role: 'delivery',
-        status: 'active',
-        isAvailable: true,
-        currentLocation: { $exists: true, $ne: null }
-      });
-
-      if (availableDeliveryPersons.length === 0) {
-        console.log('No available delivery persons found');
-        return null;
-      }
-
-      // Find the nearest delivery person
-      const nearestAssignment = findNearestDeliveryPerson(
-        availableDeliveryPersons,
-        order.customerLocation.latitude,
-        order.customerLocation.longitude
-      );
-
-      if (!nearestAssignment) {
-        console.log('No delivery person found within reasonable distance');
-        return null;
-      }
-
-      const { deliveryPerson, distance, timeEstimate } = nearestAssignment;
-
-      // Update the order with the assigned delivery person and time estimate
-      const updatedOrder = await Orders.findByIdAndUpdate(
-        orderId,
-        {
-          deliveryMan: deliveryPerson._id,
-          estimatedDeliveryTime: timeEstimate.estimatedDeliveryTime,
-          assignedAt: new Date()
-        },
-        { new: true }
-      ).populate('deliveryMan', 'name email phone vehicleType');
-
-      // Notify the assigned delivery person
-      const io = socketService.getIO();
-      if (io) {
-        io.to(`delivery-${deliveryPerson._id}`).emit('delivery-assigned', {
-          type: 'delivery-assigned',
-          order: updatedOrder,
-          distance: distance,
-          timeEstimate: formatTimeEstimate(timeEstimate),
-          message: `You have been assigned to deliver order #${orderId.slice(-8)}. Distance: ${Math.round(distance/1000)}km, ETA: ${formatTimeEstimate(timeEstimate).formattedTime}`
-        });
-      }
-
-      console.log(`Auto-assigned delivery person ${deliveryPerson.name} to order ${orderId}. Distance: ${Math.round(distance/1000)}km`);
-      
-      return {
-        deliveryPerson,
-        distance,
-        timeEstimate: formatTimeEstimate(timeEstimate)
-      };
-    } catch (error) {
-      console.error('Error in auto-assignment:', error);
-      throw error;
-    }
-  },
 
   // Get real-time ETA for an order
   getRealTimeETA: async (req, res) => {
@@ -254,14 +180,23 @@ const orderController = {
         order.items.every(item => item.food !== null)
       );
       
+      // Clean up deliveryMan data - only include if it has valid data
+      const cleanedOrders = validOrders.map(order => {
+        const orderObj = order.toObject();
+        if (orderObj.deliveryMan && (!orderObj.deliveryMan._id || !orderObj.deliveryMan.name)) {
+          orderObj.deliveryMan = null;
+        }
+        return orderObj;
+      });
+      
       console.log('📊 getAllOrders: Found orders:', orders.length);
       console.log('📊 getAllOrders: Valid orders (no deleted food):', validOrders.length);
       console.log('📊 getAllOrders: Filtered out orders with deleted food:', orders.length - validOrders.length);
       
       res.status(200).json({ 
         message: "Orders retrieved successfully",
-        data: validOrders,
-        orders: validOrders // Keep both for backward compatibility
+        data: cleanedOrders,
+        orders: cleanedOrders // Keep both for backward compatibility
       });
     } catch (error) {
       console.error('Error in getAllOrders:', error); // Debug log
@@ -618,6 +553,11 @@ const orderController = {
         ...order.toObject(),
         items: validItems
       };
+      
+      // Clean up deliveryMan data - only include if it has valid data
+      if (orderDetails.deliveryMan && (!orderDetails.deliveryMan._id || !orderDetails.deliveryMan.name)) {
+        orderDetails.deliveryMan = null;
+      }
       
       res.status(200).json({
         message: "Order details retrieved successfully",

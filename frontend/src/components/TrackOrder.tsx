@@ -16,9 +16,12 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
-  Truck
+  Truck,
+  Route,
+  Activity
 } from 'lucide-react';
 import { calculateDistance, formatDistance, calculateETA, formatTime } from '@/utils/distanceCalculator';
+import { trajectoryService, TrajectoryPoint } from '@/services/trajectoryService';
 import { io, Socket } from 'socket.io-client';
 import 'leaflet/dist/leaflet.css';
 
@@ -103,6 +106,7 @@ const MapBounds: React.FC<MapBoundsProps> = ({ positions }) => {
 
 const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
   const [deliveryLocation, setDeliveryLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -110,6 +114,7 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
   const [eta, setEta] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [showTrajectory, setShowTrajectory] = useState(true);
 
   // Restaurant location (fixed)
   const restaurantLocation: [number, number] = [36.90272039645084, 10.187488663609964];
@@ -123,20 +128,54 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
     if (order.deliveryMan?.currentLocation && order.deliveryMan.currentLocation.latitude && order.deliveryMan.currentLocation.longitude) {
       console.log('✅ Setting initial delivery location from order data:', order.deliveryMan.currentLocation);
       setDeliveryLocation(order.deliveryMan.currentLocation);
+      
+      // Add initial point to trajectory
+      if (order.deliveryMan._id) {
+        trajectoryService.addPoint(order._id, order.deliveryMan._id, {
+          latitude: order.deliveryMan.currentLocation.latitude,
+          longitude: order.deliveryMan.currentLocation.longitude,
+          timestamp: new Date().toISOString(),
+          accuracy: order.deliveryMan.currentLocation.accuracy || 10
+        });
+      }
     } else {
       console.log('❌ No delivery location in order data');
     }
-  }, [order.deliveryMan]);
+  }, [order.deliveryMan, order._id]);
+
+  // Load existing trajectory
+  useEffect(() => {
+    if (order.deliveryMan?._id) {
+      const existingTrajectory = trajectoryService.getTrajectory(order._id, order.deliveryMan._id);
+      setTrajectory(existingTrajectory);
+      console.log('📍 Loaded existing trajectory:', existingTrajectory.length, 'points');
+    }
+  }, [order._id, order.deliveryMan?._id]);
+
+  // Cleanup trajectory when component unmounts
+  useEffect(() => {
+    return () => {
+      if (order.deliveryMan?._id) {
+        // Keep trajectory data for a while, don't clear immediately
+        // trajectoryService.clearTrajectory(order._id, order.deliveryMan._id);
+      }
+    };
+  }, [order._id, order.deliveryMan?._id]);
 
   // Socket.io connection
   useEffect(() => {
     if (!isOpen) return;
 
+    console.log('🔌 Initializing WebSocket connection for order tracking...');
+    
     const newSocket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
-      transports: ['websocket']
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
+      timeout: 20000
     });
 
     newSocket.on('connect', () => {
+      console.log('✅ WebSocket connected successfully');
       setIsConnected(true);
       setError('');
       
@@ -145,40 +184,100 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
       if (user._id) {
         newSocket.emit('join-room', { userId: user._id, role: 'user' });
         console.log('🔗 Customer joined user room:', user._id);
+        console.log('📋 Tracking order:', order._id);
+        console.log('🚚 Delivery man assigned:', order.deliveryMan?._id);
+      } else {
+        console.error('❌ No user ID found in localStorage');
+        setError('User authentication required for tracking');
       }
     });
 
-    newSocket.on('disconnect', () => {
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ WebSocket connection error:', error);
+      setError('Failed to connect to tracking service');
       setIsConnected(false);
     });
 
+    newSocket.on('disconnect', (reason) => {
+      console.log('🔌 WebSocket disconnected:', reason);
+      setIsConnected(false);
+    });
+
+    // Listen for both event names for compatibility
     newSocket.on('delivery-location-update', (data: { orderId: string; location: { latitude: number; longitude: number }; timestamp: string }) => {
-      console.log('📍 Received delivery location update:', data);
+      console.log('📍 Received delivery-location-update:', data);
       if (data.orderId === order._id) {
         console.log('✅ Updating delivery location for order:', order._id);
         setDeliveryLocation(data.location);
         setLastUpdate(new Date(data.timestamp));
         updateCalculations(data.location);
+        
+        // Add point to trajectory
+        if (order.deliveryMan?._id) {
+          trajectoryService.addPoint(order._id, order.deliveryMan._id, {
+            latitude: data.location.latitude,
+            longitude: data.location.longitude,
+            timestamp: data.timestamp,
+            accuracy: 10 // Default accuracy if not provided
+          });
+          
+          // Update trajectory state
+          const updatedTrajectory = trajectoryService.getTrajectory(order._id, order.deliveryMan._id);
+          setTrajectory(updatedTrajectory);
+        }
       } else {
         console.log('❌ Order ID mismatch:', data.orderId, 'vs', order._id);
       }
     });
 
+    newSocket.on('location-update', (data: { orderId: string; location: { latitude: number; longitude: number }; timestamp: string }) => {
+      console.log('📍 Received location-update:', data);
+      if (data.orderId === order._id) {
+        console.log('✅ Updating delivery location for order (legacy event):', order._id);
+        setDeliveryLocation(data.location);
+        setLastUpdate(new Date(data.timestamp));
+        updateCalculations(data.location);
+        
+        // Add point to trajectory
+        if (order.deliveryMan?._id) {
+          trajectoryService.addPoint(order._id, order.deliveryMan._id, {
+            latitude: data.location.latitude,
+            longitude: data.location.longitude,
+            timestamp: data.timestamp,
+            accuracy: 10
+          });
+          
+          const updatedTrajectory = trajectoryService.getTrajectory(order._id, order.deliveryMan._id);
+          setTrajectory(updatedTrajectory);
+        }
+      }
+    });
+
     newSocket.on('order-updated', (data: { order: Order }) => {
+      console.log('📦 Received order-updated:', data);
       if (data.order._id === order._id) {
+        console.log('✅ Order updated, checking for delivery man location...');
         // Update order data if needed
         if (data.order.deliveryMan?.currentLocation && data.order.deliveryMan.currentLocation.latitude && data.order.deliveryMan.currentLocation.longitude) {
+          console.log('📍 Setting delivery location from order update:', data.order.deliveryMan.currentLocation);
           setDeliveryLocation(data.order.deliveryMan.currentLocation);
         }
       }
     });
 
+    // Add error handling for WebSocket events
+    newSocket.on('error', (error) => {
+      console.error('❌ WebSocket error:', error);
+      setError('WebSocket connection error');
+    });
+
     setSocket(newSocket);
 
     return () => {
+      console.log('🔌 Closing WebSocket connection...');
       newSocket.close();
     };
-  }, [isOpen, order._id]);
+  }, [isOpen, order._id, order.deliveryMan?._id]);
 
   // Calculate distance and ETA
   const updateCalculations = (deliveryPos: { latitude: number; longitude: number }) => {
@@ -201,7 +300,7 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
     }
   }, [deliveryLocation, order.customerLocation]);
 
-  // Get all positions for map bounds
+  // Get all positions for map bounds (including trajectory)
   const getAllPositions = (): [number, number][] => {
     const positions: [number, number][] = [restaurantLocation];
     if (customerLocation) {
@@ -210,10 +309,16 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
     if (deliveryLocation) {
       positions.push([deliveryLocation.latitude, deliveryLocation.longitude]);
     }
+    // Add trajectory points for better bounds
+    if (trajectory.length > 0) {
+      trajectory.forEach(point => {
+        positions.push([point.latitude, point.longitude]);
+      });
+    }
     return positions;
   };
 
-  // Get route polyline positions
+  // Get route polyline positions (direct route)
   const getRoutePositions = (): [number, number][] => {
     const positions: [number, number][] = [restaurantLocation];
     if (deliveryLocation) {
@@ -223,6 +328,11 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
       positions.push(customerLocation);
     }
     return positions;
+  };
+
+  // Get trajectory polyline positions
+  const getTrajectoryPositions = (): [number, number][] => {
+    return trajectory.map(point => [point.latitude, point.longitude]);
   };
 
   // Get status badge color
@@ -358,13 +468,25 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
                   ) : null
                 )}
                 
-                {/* Route Polyline */}
+                {/* Trajectory Polyline (actual path taken) */}
+                {showTrajectory && trajectory.length > 1 && (
+                  <Polyline
+                    positions={getTrajectoryPositions()}
+                    color="#10b981"
+                    weight={3}
+                    opacity={0.7}
+                    dashArray="5, 5"
+                  />
+                )}
+                
+                {/* Direct Route Polyline (straight line) */}
                 {routePositions.length > 1 && (
                   <Polyline
                     positions={routePositions}
                     color="#3b82f6"
-                    weight={4}
-                    opacity={0.8}
+                    weight={2}
+                    opacity={0.5}
+                    dashArray="10, 10"
                   />
                 )}
               </MapContainer>
@@ -402,6 +524,25 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
                         <span className="text-gray-600">Estimated Delivery:</span>
                         <span className="font-medium">{formatEstimatedTime(order.estimatedDeliveryTime)}</span>
                       </div>
+                      
+                      {/* WebSocket Connection Status */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Tracking:</span>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <span className={`text-xs ${isConnected ? 'text-green-700' : 'text-red-700'}`}>
+                            {isConnected ? 'Connected' : 'Disconnected'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Last Update */}
+                      {lastUpdate && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Last Update:</span>
+                          <span className="text-xs">{lastUpdate.toLocaleTimeString()}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -472,6 +613,67 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
                   </>
                 )}
 
+                {/* Trajectory Controls */}
+                {canTrackDelivery && trajectory.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Route className="h-4 w-4" />
+                        Trajectory
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Show Path:</span>
+                          <Button
+                            size="sm"
+                            variant={showTrajectory ? "default" : "outline"}
+                            onClick={() => setShowTrajectory(!showTrajectory)}
+                          >
+                            {showTrajectory ? "Hide" : "Show"}
+                          </Button>
+                        </div>
+                        
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Points tracked:</span>
+                            <span className="font-medium">{trajectory.length}</span>
+                          </div>
+                          {trajectory.length > 1 && (
+                            <div className="flex justify-between">
+                              <span>Total distance:</span>
+                              <span className="font-medium">
+                                {formatDistance(trajectory.reduce((total, point, index) => {
+                                  if (index === 0) return 0;
+                                  const prevPoint = trajectory[index - 1];
+                                  return total + calculateDistance(
+                                    prevPoint.latitude,
+                                    prevPoint.longitude,
+                                    point.latitude,
+                                    point.longitude
+                                  );
+                                }, 0))}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="text-xs text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-0.5 bg-green-500"></div>
+                            <span>Actual path</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-0.5 bg-blue-500"></div>
+                            <span>Direct route</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Status Messages */}
                 {!canTrackDelivery && (
                   <Card>
@@ -497,6 +699,46 @@ const TrackOrder: React.FC<TrackOrderProps> = ({ isOpen, onClose, order }) => {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Connection Debug Info */}
+                <Card className="border-gray-200 bg-gray-50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Connection Debug
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">WebSocket:</span>
+                        <span className={isConnected ? 'text-green-600' : 'text-red-600'}>
+                          {isConnected ? 'Connected' : 'Disconnected'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Order ID:</span>
+                        <span className="font-mono">{order._id.slice(-8)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Delivery Man:</span>
+                        <span className="font-mono">{order.deliveryMan?._id?.slice(-8) || 'None'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">User ID:</span>
+                        <span className="font-mono">
+                          {JSON.parse(localStorage.getItem('user') || '{}')._id?.slice(-8) || 'None'}
+                        </span>
+                      </div>
+                      {lastUpdate && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Last Update:</span>
+                          <span>{lastUpdate.toLocaleTimeString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {error && (
                   <Card className="border-red-200 bg-red-50">

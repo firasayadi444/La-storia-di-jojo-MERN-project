@@ -89,12 +89,15 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     if (items.length > 0) {
       console.log('🛒 Saving cart to localStorage:', items);
       localStorage.setItem('cart', JSON.stringify(items));
-    } else if (items.length === 0 && isAuthenticated && user?.role === 'user') {
-      // Only clear localStorage when cart is empty and user is authenticated
-      console.log('🛒 Clearing cart from localStorage (empty cart)');
-      localStorage.removeItem('cart');
+    } else if (items.length === 0) {
+      // Clear localStorage when cart is empty
+      const savedCart = localStorage.getItem('cart');
+      if (savedCart) {
+        console.log('🛒 Clearing cart from localStorage (empty cart)');
+        localStorage.removeItem('cart');
+      }
     }
-  }, [items, isAuthenticated, user?.role]);
+  }, [items]);
 
   const addToCart = (food: Food, quantity: number = 1) => {
     // Only allow adding to cart if user is authenticated and is a regular user
@@ -137,7 +140,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   };
 
   const clearCart = () => {
+    console.log('🛒 Clearing cart...');
     setItems([]);
+    localStorage.removeItem('cart');
+    console.log('🛒 Cart cleared successfully');
   };
 
   const getTotalItems = () => {

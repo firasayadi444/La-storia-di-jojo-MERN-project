@@ -265,10 +265,10 @@ const deliverymanController = {
     }
   },
 
-  // Update delivery person location
+  // Update delivery person location with enhanced features
   updateLocation: async (req, res) => {
     try {
-      const { latitude, longitude, accuracy, speed, heading } = req.body;
+      const { latitude, longitude, accuracy, speed, heading, altitude, altitudeAccuracy } = req.body;
       const deliveryManId = req.user._id;
 
       // Validate location data
@@ -284,17 +284,30 @@ const deliverymanController = {
         return res.status(400).json({ message: 'Invalid longitude. Must be between -180 and 180' });
       }
 
-      // Update delivery person's current location
+      // Validate accuracy (should be reasonable)
+      if (accuracy && (accuracy < 0 || accuracy > 1000)) {
+        return res.status(400).json({ message: 'Invalid accuracy value' });
+      }
+
+      // Update delivery person's current location with enhanced data
+      const updateData = {
+        'currentLocation.coordinates': [longitude, latitude], // GeoJSON format: [lng, lat]
+        'currentLocation.accuracy': accuracy || 10,
+        'currentLocation.speed': speed || 0,
+        'currentLocation.heading': heading || 0,
+        'currentLocation.lastUpdated': new Date()
+      };
+
+      // Add altitude data if available
+      if (altitude !== undefined) {
+        updateData['currentLocation.altitude'] = altitude;
+        updateData['currentLocation.altitudeAccuracy'] = altitudeAccuracy || null;
+      }
+
       const user = await Users.findByIdAndUpdate(
         deliveryManId,
         {
-          $set: {
-            'currentLocation.coordinates': [longitude, latitude], // GeoJSON format: [lng, lat]
-            'currentLocation.accuracy': accuracy || 10,
-            'currentLocation.speed': speed || 0,
-            'currentLocation.heading': heading || 0,
-            'currentLocation.lastUpdated': new Date()
-          }
+          $set: updateData
         },
         { new: true }
       );
@@ -309,21 +322,27 @@ const deliverymanController = {
         status: { $in: ['out_for_delivery', 'ready'] }
       }).populate('user', '_id name email phone');
 
-      // Broadcast location update to customers
+      // Broadcast location update to customers with enhanced data
       const io = socketService.getIO();
       if (io) {
+        const locationData = {
+          latitude,
+          longitude,
+          accuracy: accuracy || 10,
+          speed: speed || 0,
+          heading: heading || 0,
+          altitude: altitude || null,
+          altitudeAccuracy: altitudeAccuracy || null,
+          timestamp: new Date().toISOString()
+        };
+
         activeOrders.forEach(order => {
-          // Emit location update to customer
+          // Emit enhanced location update to customer
           io.to(`user-${order.user._id}`).emit('delivery-location-update', {
             orderId: order._id,
-            location: {
-              latitude: latitude,
-              longitude: longitude,
-              accuracy: accuracy || 10,
-              speed: speed || 0,
-              heading: heading || 0
-            },
-            timestamp: new Date().toISOString()
+            location: locationData,
+            deliveryManId: deliveryManId,
+            updateType: 'manual'
           });
 
           // Calculate and broadcast ETA update
@@ -338,6 +357,14 @@ const deliverymanController = {
               formattedTime: formattedETA.formattedTime
             });
           }
+        });
+
+        // Also broadcast to admin for monitoring
+        io.to('admin').emit('delivery-location-update', {
+          deliveryManId: deliveryManId,
+          location: locationData,
+          activeOrdersCount: activeOrders.length,
+          updateType: 'manual'
         });
       }
 

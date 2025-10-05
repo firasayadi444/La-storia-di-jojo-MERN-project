@@ -4,9 +4,10 @@ import L from 'leaflet';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MapPin, Navigation, X, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { MapPin, Navigation, X, Loader2, AlertCircle, CheckCircle, Smartphone, Map, RefreshCw, ExternalLink } from 'lucide-react';
 import { reverseGeocode, getCurrentLocation } from '@/utils/reverseGeocoding';
 import { calculateDistance, formatDistance } from '@/utils/distanceCalculator';
+import { locationService } from '@/services/locationService';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default markers in react-leaflet
@@ -82,6 +83,9 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [permissionStatus, setPermissionStatus] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown');
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [locationHistory, setLocationHistory] = useState<Array<{latitude: number, longitude: number, address: string, timestamp: string}>>([]);
 
   // Default center (Tunis, Tunisia)
   const defaultCenter: [number, number] = [36.8065, 10.1815];
@@ -92,15 +96,68 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       setSelectedLocation(initialLocation || null);
       setAddress('');
       setError('');
+      checkGeolocationPermission();
+      loadLocationHistory();
     }
   }, [isOpen, initialLocation]);
+
+  // Check geolocation permission status
+  const checkGeolocationPermission = async () => {
+    if (!navigator.permissions) {
+      setPermissionStatus('unknown');
+      return;
+    }
+
+    try {
+      const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+      setPermissionStatus(permission.state);
+      
+      permission.onchange = () => {
+        setPermissionStatus(permission.state);
+      };
+    } catch (error) {
+      console.warn('Permission API not supported:', error);
+      setPermissionStatus('unknown');
+    }
+  };
+
+  // Load location history from localStorage
+  const loadLocationHistory = () => {
+    try {
+      const history = localStorage.getItem('locationHistory');
+      if (history) {
+        setLocationHistory(JSON.parse(history));
+      }
+    } catch (error) {
+      console.warn('Failed to load location history:', error);
+    }
+  };
+
+  // Save location to history
+  const saveToHistory = (location: {latitude: number, longitude: number, address: string}) => {
+    const newEntry = {
+      ...location,
+      timestamp: new Date().toISOString()
+    };
+    
+    const updatedHistory = [newEntry, ...locationHistory.slice(0, 4)]; // Keep last 5 locations
+    setLocationHistory(updatedHistory);
+    
+    try {
+      localStorage.setItem('locationHistory', JSON.stringify(updatedHistory));
+    } catch (error) {
+      console.warn('Failed to save location history:', error);
+    }
+  };
 
   const handleUseCurrentLocation = async () => {
     setIsLoading(true);
     setError('');
+    setIsRetrying(false);
 
     try {
-      const location = await getCurrentLocation();
+      // Use the improved location service with better error handling
+      const location = await locationService.getCurrentLocation();
       setCurrentLocation(location);
       setSelectedLocation(location);
       
@@ -109,12 +166,49 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       setAddress(geocodeResult.address);
       setAccuracy(geocodeResult.accuracy);
       
+      // Save to history
+      saveToHistory({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: geocodeResult.address
+      });
+      
+      // Automatically confirm and close if we have both location and address
+      if (location && geocodeResult.address) {
+        onLocationSelect({
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: geocodeResult.address,
+          accuracy: geocodeResult.accuracy
+        });
+        onClose();
+        return;
+      }
+      
       setStep('map');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get current location');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to get current location';
+      
+      // Provide more specific error messages
+      if (errorMessage.includes('denied') || errorMessage.includes('permission')) {
+        setError('Location access denied. Please enable location permissions in your browser settings and try again.');
+        setPermissionStatus('denied');
+      } else if (errorMessage.includes('timeout')) {
+        setError('Location request timed out. Please check your internet connection and try again.');
+        setIsRetrying(true);
+      } else if (errorMessage.includes('unavailable')) {
+        setError('Location services are currently unavailable. Please try again later or select your location on the map.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRetryLocation = async () => {
+    setIsRetrying(false);
+    await handleUseCurrentLocation();
   };
 
   const handleChooseOnMap = () => {
@@ -131,11 +225,33 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       const geocodeResult = await reverseGeocode(lat, lng);
       setAddress(geocodeResult.address);
       setAccuracy(geocodeResult.accuracy);
+      
+      // Save to history
+      saveToHistory({
+        latitude: lat,
+        longitude: lng,
+        address: geocodeResult.address
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get address');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSelectFromHistory = async (historyItem: {latitude: number, longitude: number, address: string}) => {
+    setSelectedLocation({ latitude: historyItem.latitude, longitude: historyItem.longitude });
+    setAddress(historyItem.address);
+    setAccuracy(10); // Default accuracy for history items
+    
+    // Automatically confirm and close for history items
+    onLocationSelect({
+      latitude: historyItem.latitude,
+      longitude: historyItem.longitude,
+      address: historyItem.address,
+      accuracy: 10
+    });
+    onClose();
   };
 
   const handleConfirmLocation = () => {
@@ -162,39 +278,103 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-full h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="flex items-center gap-2">
-            <MapPin className="h-6 w-6 text-italian-green-600" />
+      <DialogContent className="max-w-4xl w-full h-[95vh] sm:h-[90vh] p-0">
+        <DialogHeader className="p-4 sm:p-6 pb-0">
+          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-italian-green-600" />
             Select Delivery Location
           </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden">
           {step === 'method' && (
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
                   How would you like to select your location?
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-sm sm:text-base text-gray-600">
                   Choose your preferred method to set the delivery address
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Recent Locations */}
+              {locationHistory.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4" />
+                    Recent Locations
+                  </h4>
+                  <div className="space-y-2">
+                    {locationHistory.slice(0, 3).map((item, index) => (
+                      <Card 
+                        key={index}
+                        className="cursor-pointer hover:shadow-md transition-all duration-200 border hover:border-italian-green-300"
+                        onClick={() => handleSelectFromHistory(item)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {item.address}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(item.timestamp).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <Card 
-                  className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 hover:border-italian-green-300"
-                  onClick={handleUseCurrentLocation}
+                  className={`cursor-pointer hover:shadow-lg transition-all duration-200 border-2 ${
+                    permissionStatus === 'denied' 
+                      ? 'border-red-200 bg-red-50' 
+                      : 'hover:border-italian-green-300'
+                  }`}
+                  onClick={permissionStatus === 'denied' ? undefined : handleUseCurrentLocation}
                 >
-                  <CardContent className="p-6 text-center">
-                    <Navigation className="h-12 w-12 text-italian-green-600 mx-auto mb-4" />
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                      Use Current Location
-                    </h4>
-                    <p className="text-gray-600 text-sm">
-                      Automatically detect your current position using GPS
-                    </p>
+                  <CardContent className="p-4 sm:p-6 text-center">
+                    <div className="flex flex-col items-center">
+                      {permissionStatus === 'denied' ? (
+                        <AlertCircle className="h-8 w-8 sm:h-12 sm:w-12 text-red-500 mx-auto mb-3 sm:mb-4" />
+                      ) : (
+                        <Navigation className="h-8 w-8 sm:h-12 sm:w-12 text-italian-green-600 mx-auto mb-3 sm:mb-4" />
+                      )}
+                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                        {permissionStatus === 'denied' ? 'Location Blocked' : 'Use Current Location'}
+                      </h4>
+                      <p className="text-gray-600 text-xs sm:text-sm mb-3">
+                        {permissionStatus === 'denied' 
+                          ? 'Enable location permissions in browser settings'
+                          : 'Automatically detect and save your current position'
+                        }
+                      </p>
+                      {permissionStatus === 'denied' ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open('chrome://settings/content/location', '_blank');
+                          }}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Open Settings
+                        </Button>
+                      ) : (
+                        <div className="text-xs text-italian-green-600 font-medium">
+                          ✨ Auto-save enabled
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -202,12 +382,12 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                   className="cursor-pointer hover:shadow-lg transition-all duration-200 border-2 hover:border-italian-green-300"
                   onClick={handleChooseOnMap}
                 >
-                  <CardContent className="p-6 text-center">
-                    <MapPin className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                  <CardContent className="p-4 sm:p-6 text-center">
+                    <Map className="h-8 w-8 sm:h-12 sm:w-12 text-blue-600 mx-auto mb-3 sm:mb-4" />
+                    <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
                       Choose on Map
                     </h4>
-                    <p className="text-gray-600 text-sm">
+                    <p className="text-gray-600 text-xs sm:text-sm">
                       Click anywhere on the map to select your location
                     </p>
                   </CardContent>
@@ -215,9 +395,24 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-red-600" />
-                  <span className="text-red-700">{error}</span>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <span className="text-red-700 text-sm sm:text-base">{error}</span>
+                      {isRetrying && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2 text-xs"
+                          onClick={handleRetryLocation}
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Try Again
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -225,21 +420,35 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
 
           {step === 'map' && (
             <div className="h-full flex flex-col">
-              <div className="p-4 border-b bg-gray-50">
+              <div className="p-3 sm:p-4 border-b bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setStep('method')}
+                      className="text-xs sm:text-sm"
                     >
-                      <X className="h-4 w-4 mr-2" />
+                      <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       Back
                     </Button>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">
                       Click on the map to select your location
                     </span>
+                    <span className="text-xs text-gray-600 sm:hidden">
+                      Tap to select
+                    </span>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUseCurrentLocation}
+                    className="text-xs sm:text-sm"
+                    disabled={isLoading}
+                  >
+                    <Navigation className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    My Location
+                  </Button>
                 </div>
               </div>
 
@@ -249,6 +458,9 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                   zoom={15}
                   className="h-full w-full"
                   scrollWheelZoom={true}
+                  touchZoom={true}
+                  doubleClickZoom={true}
+                  zoomControl={true}
                 >
                   <MapCenter center={getMapCenter()} />
                   <TileLayer
@@ -271,52 +483,82 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
 
                 {isLoading && (
                   <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
-                    <div className="flex items-center gap-2 bg-white p-4 rounded-lg shadow-lg">
-                      <Loader2 className="h-5 w-5 animate-spin text-italian-green-600" />
-                      <span className="text-gray-700">Getting address...</span>
+                    <div className="flex items-center gap-2 bg-white p-3 sm:p-4 rounded-lg shadow-lg mx-4">
+                      <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin text-italian-green-600" />
+                      <span className="text-sm sm:text-base text-gray-700">Getting address...</span>
                     </div>
                   </div>
                 )}
               </div>
 
               {selectedLocation && address && (
-                <div className="p-4 border-t bg-gray-50">
+                <div className="p-3 sm:p-4 border-t bg-green-50">
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
-                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">Selected Location:</p>
-                        <p className="text-sm text-gray-600 break-words">{address}</p>
+                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base">✅ Location Ready!</p>
+                        <p className="text-xs sm:text-sm text-gray-600 break-words">{address}</p>
                         <p className="text-xs text-gray-500 mt-1">
                           Accuracy: ±{Math.round(accuracy)}m
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Button
                         onClick={handleConfirmLocation}
-                        className="flex-1 bg-italian-green-600 hover:bg-italian-green-700"
+                        className="flex-1 bg-italian-green-600 hover:bg-italian-green-700 text-sm sm:text-base font-medium"
                       >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Confirm Location
+                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        Save & Continue
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() => setStep('method')}
+                        className="text-xs sm:text-sm"
                       >
                         Change Method
                       </Button>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500 text-center">
+                      This location will be saved to your order
                     </div>
                   </div>
                 </div>
               )}
 
+              {/* Show confirmation button even if address is loading */}
+              {selectedLocation && !address && !isLoading && (
+                <div className="p-3 sm:p-4 border-t bg-yellow-50">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base">Location Selected</p>
+                        <p className="text-xs sm:text-sm text-gray-600">
+                          Getting address details...
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      onClick={() => setStep('method')}
+                      variant="outline"
+                      className="w-full text-xs sm:text-sm"
+                    >
+                      Choose Different Method
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {error && (
-                <div className="p-4 border-t bg-red-50">
-                  <div className="flex items-center gap-2 text-red-700">
-                    <AlertCircle className="h-5 w-5" />
-                    <span className="text-sm">{error}</span>
+                <div className="p-3 sm:p-4 border-t bg-red-50">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm text-red-700">{error}</span>
                   </div>
                 </div>
               )}

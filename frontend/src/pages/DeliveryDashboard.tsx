@@ -30,7 +30,9 @@ import {
   WifiOff,
   CreditCard,
   Banknote,
-  RefreshCw
+  RefreshCw,
+  ExternalLink,
+  Map
 } from 'lucide-react';
 import DeliveryTracking from '../components/DeliveryTracking';
 
@@ -48,6 +50,59 @@ const DeliveryDashboard: React.FC = () => {
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<Order | null>(null);
   const { toast } = useToast();
   const { registerRefreshCallback, unregisterRefreshCallback } = useSocket();
+
+  // Function to open Google Maps with customer location
+  const openGoogleMaps = (order: Order) => {
+    if (!order.customerLocation || !order.customerLocation.latitude || !order.customerLocation.longitude) {
+      toast({
+        title: "Error",
+        description: "Customer location not available for this order",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { latitude, longitude } = order.customerLocation;
+    const address = order.deliveryAddress || 'Customer Location';
+    
+    // Generate Google Maps URL
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
+    
+    // Try to open in Google Maps app first (mobile), fallback to web
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      // Try Google Maps app first
+      const appUrl = `comgooglemaps://?daddr=${latitude},${longitude}&directionsmode=driving`;
+      
+      // Create a temporary link to test if the app is installed
+      const testLink = document.createElement('a');
+      testLink.href = appUrl;
+      testLink.style.display = 'none';
+      document.body.appendChild(testLink);
+      
+      try {
+        testLink.click();
+        // If app doesn't open within 2 seconds, open web version
+        setTimeout(() => {
+          window.open(googleMapsUrl, '_blank');
+        }, 2000);
+      } catch (error) {
+        // Fallback to web version
+        window.open(googleMapsUrl, '_blank');
+      } finally {
+        document.body.removeChild(testLink);
+      }
+    } else {
+      // Desktop: open web version
+      window.open(googleMapsUrl, '_blank');
+    }
+
+    toast({
+      title: "Opening Google Maps",
+      description: `Navigating to ${address}`,
+    });
+  };
 
   // Fix: Only show orders assigned to this delivery man and with correct status
   const activeOrders = orders.filter(order =>
@@ -409,39 +464,55 @@ const DeliveryDashboard: React.FC = () => {
                           </div>
                         )}
                       </div>
-                      <div className="mt-4 flex space-x-2">
-                        {(order.status === 'ready' || order.status === 'pending') && (
+                      <div className="mt-4 space-y-2">
+                        {/* Main Action Buttons */}
+                        <div className="flex space-x-2">
+                          {(order.status === 'ready' || order.status === 'pending') && (
+                            <Button
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setIsStatusDialogOpen(true);
+                              }}
+                              className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              <Truck className="h-4 w-4 mr-2" />
+                              Start Delivery
+                            </Button>
+                          )}
+                          {order.status === 'out_for_delivery' && (
+                            <Button
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setIsStatusDialogOpen(true);
+                              }}
+                              className="flex-1 bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Mark Delivered
+                            </Button>
+                          )}
+                        </div>
+                        
+                        {/* Navigation Buttons */}
+                        <div className="flex space-x-2">
                           <Button
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setIsStatusDialogOpen(true);
-                            }}
-                            className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                            onClick={() => setSelectedOrderForTracking(order)}
+                            variant="outline"
+                            className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
                           >
-                            <Truck className="h-4 w-4 mr-2" />
-                            Start Delivery
+                            <Navigation className="h-4 w-4 mr-2" />
+                            Track
                           </Button>
-                        )}
-                        {order.status === 'out_for_delivery' && (
                           <Button
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setIsStatusDialogOpen(true);
-                            }}
-                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            onClick={() => openGoogleMaps(order)}
+                            variant="outline"
+                            className="flex-1 bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                            disabled={!order.customerLocation || !order.customerLocation.latitude}
                           >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Mark Delivered
+                            <Map className="h-4 w-4 mr-2" />
+                            Track on Maps
                           </Button>
-                        )}
-                        <Button
-                          onClick={() => setSelectedOrderForTracking(order)}
-                          variant="outline"
-                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-                        >
-                          <Navigation className="h-4 w-4 mr-2" />
-                          Track
-                        </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -493,46 +564,6 @@ const DeliveryDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* My Delivery Trajectory Section */}
-        {user && (activeOrders.length > 0 || completedOrders.length > 0) && (
-          <div className="mt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Navigation className="h-6 w-6" />
-              My Delivery Trajectory
-            </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Current Active Order Trajectory */}
-              {activeOrders.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Delivery</h3>
-                  {activeOrders.map((order) => (
-                    <Card key={order._id} className="p-4">
-                      <div className="text-center py-4 text-gray-500">
-                        <MapPin className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p>Delivery map temporarily unavailable</p>
-                        <p className="text-sm">Order #{order._id.slice(-6)}</p>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-              
-              {/* Recent Completed Order Trajectory */}
-              {completedOrders.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Delivery</h3>
-                  <Card className="p-4">
-                    <div className="text-center py-4 text-gray-500">
-                      <MapPin className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                      <p>Delivery map temporarily unavailable</p>
-                      <p className="text-sm">Order #{completedOrders[0]._id.slice(-6)}</p>
-                    </div>
-                  </Card>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Status Update Dialog */}

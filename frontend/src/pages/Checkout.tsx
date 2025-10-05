@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import StripePayment from '@/components/StripePayment';
 import LocationPicker from '@/components/LocationPicker';
+import { forceClearCart } from '@/utils/cartUtils';
 import { CheckCircle, CreditCard, Banknote, ArrowLeft, Shield, Clock, MapPin, User, Phone, Mail, Sparkles, Navigation } from 'lucide-react';
 
 const Checkout: React.FC = () => {
@@ -156,6 +157,17 @@ const Checkout: React.FC = () => {
           clearCart();
           localStorage.removeItem('checkoutFormData');
           localStorage.removeItem('pendingOrderData');
+          
+          // Double check that cart is cleared
+          setTimeout(() => {
+            console.log('🛒 Verifying cart is cleared after order...');
+            const remainingCart = localStorage.getItem('cart');
+            if (remainingCart) {
+              console.log('🛒 Cart still exists, forcing clear...');
+              forceClearCart();
+            }
+          }, 100);
+          
           navigate('/orders');
         } else {
           throw new Error('Failed to create order');
@@ -184,6 +196,17 @@ const Checkout: React.FC = () => {
     localStorage.removeItem('checkoutFormData');
     localStorage.removeItem('pendingOrderData');
     localStorage.removeItem('pendingOrderId');
+    
+    // Double check that cart is cleared
+    setTimeout(() => {
+      console.log('🛒 Verifying cart is cleared after payment...');
+      const remainingCart = localStorage.getItem('cart');
+      if (remainingCart) {
+        console.log('🛒 Cart still exists, forcing clear...');
+        forceClearCart();
+      }
+    }, 100);
+    
     navigate('/orders');
   };
 

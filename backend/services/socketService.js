@@ -34,41 +34,61 @@ class SocketService {
       });
 
 
-      // Handle delivery location updates
+      // Handle delivery location updates with improved performance
       socket.on('location-update', (data) => {
         console.log(`📍 Location update from delivery person:`, data);
+        
+        // Validate location data
+        if (!data.orderId || !data.location || 
+            typeof data.location.latitude !== 'number' || 
+            typeof data.location.longitude !== 'number') {
+          console.error('❌ Invalid location data received:', data);
+          return;
+        }
+
         // Broadcast location update to customer
         if (data.orderId) {
           // Get the order to find the user ID with timeout
           const Orders = require('../models/orderModel');
           const queryTimeout = setTimeout(() => {
             console.error('❌ Database query timeout for location update');
-          }, 5000); // 5 second timeout
+          }, 3000); // Reduced timeout for better performance
 
           Orders.findById(data.orderId)
             .populate('user', '_id')
-            .maxTimeMS(5000) // MongoDB query timeout
+            .maxTimeMS(3000) // Reduced MongoDB query timeout
             .then(order => {
               clearTimeout(queryTimeout);
               if (order && order.user) {
-                // Emit to both old and new event names for compatibility
-                socket.to(`user-${order.user._id}`).emit('location-update', {
-                  orderId: data.orderId,
-                  location: data.location,
-                  timestamp: data.timestamp
-                });
-                socket.to(`user-${order.user._id}`).emit('delivery-location-update', {
+                // Enhanced location data with additional metadata
+                const enhancedLocationData = {
                   orderId: data.orderId,
                   location: {
                     latitude: data.location.latitude,
                     longitude: data.location.longitude,
                     accuracy: data.location.accuracy || 10,
                     speed: data.location.speed || 0,
-                    heading: data.location.heading || 0
+                    heading: data.location.heading || 0,
+                    altitude: data.location.altitude || null,
+                    altitudeAccuracy: data.location.altitudeAccuracy || null
                   },
-                  timestamp: data.timestamp
+                  timestamp: data.timestamp,
+                  deliveryManId: socket.userId, // Track which delivery person sent this
+                  updateType: 'real-time'
+                };
+
+                // Emit to both old and new event names for compatibility
+                socket.to(`user-${order.user._id}`).emit('location-update', enhancedLocationData);
+                socket.to(`user-${order.user._id}`).emit('delivery-location-update', enhancedLocationData);
+                
+                // Also emit to admin room for monitoring
+                socket.to('admin').emit('delivery-location-update', {
+                  ...enhancedLocationData,
+                  customerId: order.user._id,
+                  orderStatus: order.status
                 });
-                console.log(`📤 Location update sent to user ${order.user._id}`);
+                
+                console.log(`📤 Location update sent to user ${order.user._id} and admin`);
               } else {
                 console.log('❌ Order or user not found for location update');
               }

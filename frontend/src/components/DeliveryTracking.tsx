@@ -19,11 +19,18 @@ import {
   Truck,
   Target,
   Route,
-  RefreshCw
+  RefreshCw,
+  ExternalLink,
+  Play,
+  Pause,
+  Map,
+  Package,
+  Utensils
 } from 'lucide-react';
 import { calculateDistance, formatDistance, calculateETA, formatTime } from '@/utils/distanceCalculator';
 import { io, Socket } from 'socket.io-client';
 import { Order } from '@/services/api';
+import GoogleMapsNavigation from './GoogleMapsNavigation';
 import { locationService, LocationData } from '@/services/locationService';
 import 'leaflet/dist/leaflet.css';
 
@@ -114,6 +121,8 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
   const [error, setError] = useState<string>('');
   const [isTracking, setIsTracking] = useState(false);
   const [mapError, setMapError] = useState<string>('');
+  const [trackingPaused, setTrackingPaused] = useState(false);
+  const [showGoogleMaps, setShowGoogleMaps] = useState(false);
   const watchId = useRef<number | null>(null);
 
   // Restaurant location (fixed)
@@ -274,6 +283,31 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
     setIsTracking(false);
   };
 
+  // Pause/Resume location tracking
+  const toggleTracking = () => {
+    if (trackingPaused) {
+      // Resume tracking
+      setTrackingPaused(false);
+      if (!isTracking) {
+        startLocationTracking();
+      }
+    } else {
+      // Pause tracking
+      setTrackingPaused(true);
+      locationService.stopTracking();
+    }
+  };
+
+  // Get customer address for Google Maps
+  const getCustomerAddress = () => {
+    return order.deliveryAddress || 'Customer Location';
+  };
+
+  // Get restaurant address for Google Maps
+  const getRestaurantAddress = () => {
+    return 'Restaurant Location'; // You can make this dynamic based on your restaurant data
+  };
+
   // Cleanup on unmount and when dialog closes
   useEffect(() => {
     return () => {
@@ -364,15 +398,16 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full h-[90vh] p-0">
-        <DialogHeader className="p-4 border-b">
+      <DialogContent className="max-w-6xl w-full h-[95vh] sm:h-[90vh] p-0">
+        <DialogHeader className="p-3 sm:p-4 border-b">
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <Truck className="h-6 w-6 text-italian-green-600" />
-              Delivery Tracking - Order #{order._id.slice(-8)}
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-italian-green-600" />
+              <span className="hidden sm:inline">Delivery Tracking - Order #{order._id.slice(-8)}</span>
+              <span className="sm:hidden">Order #{order._id.slice(-8)}</span>
             </DialogTitle>
             <div className="flex items-center gap-2">
-              <Badge className={getStatusColor(order.status)}>
+              <Badge className={`${getStatusColor(order.status)} text-xs`}>
                 {order.status.replace('_', ' ').toUpperCase()}
               </Badge>
               <Button variant="outline" size="sm" onClick={onClose}>
@@ -400,9 +435,9 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
             </div>
           </div>
 
-          <div className="flex-1 flex">
+          <div className="flex-1 flex flex-col lg:flex-row">
             {/* Map */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-h-[300px] lg:min-h-0">
               {mapError ? (
                 <div className="h-full w-full flex items-center justify-center bg-gray-100">
                   <div className="text-center p-8">
@@ -486,8 +521,8 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
             </div>
 
             {/* Info Panel */}
-            <div className="w-80 border-l bg-gray-50 overflow-y-auto">
-              <div className="p-4 space-y-4">
+            <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l bg-gray-50 overflow-y-auto max-h-[400px] lg:max-h-none">
+              <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
                 {/* Order Status */}
                 <Card>
                   <CardHeader className="pb-2">
@@ -546,12 +581,147 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
                   </CardContent>
                 </Card>
 
+                {/* Location Tracking Controls */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Navigation className="h-4 w-4" />
+                      Location Tracking
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Status:</span>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${isTracking && !trackingPaused ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          <span className="text-xs">
+                            {isTracking && !trackingPaused ? 'Active' : trackingPaused ? 'Paused' : 'Inactive'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        {!isTracking ? (
+                          <Button
+                            size="sm"
+                            onClick={startLocationTracking}
+                            disabled={isLoading}
+                            className="flex-1"
+                          >
+                            <Play className="h-3 w-3 mr-1" />
+                            Start Tracking
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant={trackingPaused ? "default" : "outline"}
+                            onClick={toggleTracking}
+                            className="flex-1"
+                          >
+                            {trackingPaused ? (
+                              <>
+                                <Play className="h-3 w-3 mr-1" />
+                                Resume
+                              </>
+                            ) : (
+                              <>
+                                <Pause className="h-3 w-3 mr-1" />
+                                Pause
+                              </>
+                            )}
+                          </Button>
+                        )}
+                        
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={getCurrentLocation}
+                          disabled={isLoading}
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      
+                      {isTracking && (
+                        <div className="text-xs text-gray-500">
+                          Location updates every 30 seconds
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Google Maps Navigation */}
+                {currentLocation && customerLocation && (
+                  <Card className="border-blue-200 bg-blue-50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2 text-blue-800">
+                        <Map className="h-4 w-4" />
+                        Navigation to Customer
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-3">
+                        {/* Customer Address Display */}
+                        <div className="bg-white rounded-lg p-3 border">
+                          <div className="flex items-start gap-2">
+                            <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">Delivery Address:</p>
+                              <p className="text-sm text-gray-700 break-words">{getCustomerAddress()}</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Navigation Component */}
+                        <GoogleMapsNavigation
+                          fromLocation={currentLocation}
+                          toLocation={customerLocation}
+                          fromAddress="Your Current Location"
+                          toAddress={getCustomerAddress()}
+                          className="text-xs"
+                        />
+                        
+                        {/* Quick Actions */}
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-blue-600 hover:bg-blue-700"
+                            onClick={() => {
+                              const url = `https://www.google.com/maps/dir/?api=1&destination=${customerLocation[0]},${customerLocation[1]}`;
+                              window.open(url, '_blank');
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Quick Open
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const url = `tel:${order.user?.phone || ''}`;
+                              if (order.user?.phone) {
+                                window.open(url);
+                              }
+                            }}
+                            disabled={!order.user?.phone}
+                          >
+                            <Phone className="h-3 w-3 mr-1" />
+                            Call
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Delivery Progress */}
                 {canTrackDelivery && currentLocation && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
-                        <Navigation className="h-4 w-4" />
+                        <Target className="h-4 w-4" />
                         Delivery Progress
                       </CardTitle>
                     </CardHeader>
@@ -569,6 +739,119 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Customer Information */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Customer Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <p className="font-medium text-sm">{order.user?.name || 'Unknown Customer'}</p>
+                          <p className="text-xs text-gray-600">Customer Name</p>
+                        </div>
+                      </div>
+                      
+                      {order.user?.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{order.user.phone}</p>
+                            <p className="text-xs text-gray-600">Phone Number</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(`tel:${order.user.phone}`)}
+                            className="text-xs"
+                          >
+                            <Phone className="h-3 w-3 mr-1" />
+                            Call
+                          </Button>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium break-words">{getCustomerAddress()}</p>
+                          <p className="text-xs text-gray-600">Delivery Address</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Order Items Details */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Order Items ({order.items?.length || 0})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      {order.items && order.items.length > 0 ? (
+                        order.items.map((item, index) => (
+                          <div key={item._id || index} className="border rounded-lg p-3 bg-gray-50">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-sm">{item.food?.name || 'Unknown Item'}</h4>
+                                <p className="text-xs text-gray-600 mb-1">{item.food?.category || 'No category'}</p>
+                                {item.food?.description && (
+                                  <p className="text-xs text-gray-500 mb-2">{item.food.description}</p>
+                                )}
+                                <div className="flex items-center gap-4 text-xs">
+                                  <span className="flex items-center gap-1">
+                                    <Utensils className="h-3 w-3" />
+                                    Qty: {item.quantity}
+                                  </span>
+                                  <span className="font-medium">
+                                    €{item.price?.toFixed(2) || '0.00'}
+                                  </span>
+                                </div>
+                              </div>
+                              {item.food?.image && (
+                                <img
+                                  src={item.food.image}
+                                  alt={item.food.name}
+                                  className="w-12 h-12 object-cover rounded-lg ml-3"
+                                  onError={(e) => {
+                                    e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=48&h=48&fit=crop`;
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-gray-500">
+                          <Package className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                          <p className="text-sm">No items found</p>
+                        </div>
+                      )}
+                      
+                      {/* Order Total */}
+                      {order.items && order.items.length > 0 && (
+                        <div className="border-t pt-3 mt-3">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-sm">Order Total:</span>
+                            <span className="font-bold text-lg text-green-600">
+                              €{order.totalAmount?.toFixed(2) || '0.00'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Location Controls */}
                 <Card>
