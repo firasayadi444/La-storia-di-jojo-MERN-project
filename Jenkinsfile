@@ -15,7 +15,7 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout code') {
             steps {
                 script {
                     // Explicit checkout
