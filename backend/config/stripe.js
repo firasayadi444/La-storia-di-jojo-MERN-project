@@ -1,3 +1,3 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder_key');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 module.exports = stripe;
