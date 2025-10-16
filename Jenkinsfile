@@ -11,7 +11,8 @@ pipeline {
         BACKEND_IMAGE = "${DOCKER_HUB_REPO}-backend"
         FRONTEND_IMAGE = "${DOCKER_HUB_REPO}-frontend"
         SONAR_TOKEN = credentials('sonar-token')
-        KUBECONFIG_FILE = credentials('jenkins-kubeconfig')  // Secret file
+        // Email configuration
+        EMAIL_RECIPIENTS = 'firas.ayadi2020@gmail.com' 
     }
 
     stages {
@@ -45,20 +46,20 @@ pipeline {
         }
         
         stage('SonarQube Analysis') {
-    steps {
-        withSonarQubeEnv('SonarQube') {
-            sh '''
-                sonar-scanner \
-                -Dsonar.projectKey=OrderApp-backend \
-                -Dsonar.sources=backend \
-                -Dsonar.exclusions=backend/tests/** \
-                -Dsonar.tests=backend/tests \
-                -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info \
-                -Dsonar.login=$SONAR_TOKEN
-            '''
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=OrderApp-backend \
+                        -Dsonar.sources=backend \
+                        -Dsonar.exclusions=backend/tests/** \
+                        -Dsonar.tests=backend/tests \
+                        -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info \
+                        -Dsonar.login=$SONAR_TOKEN
+                    '''
+                }
+            }
         }
-    }
-}
 
         stage('Environment Check') {
             steps {
@@ -247,7 +248,8 @@ pipeline {
                 }
             }
         }
-         stage('Scan Backend Image with Trivy') {
+
+        stage('Scan Backend Image with Trivy') {
             steps {
                 script {
                     def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
@@ -260,7 +262,6 @@ pipeline {
             }
         }
 
-
         stage('Build Frontend Image') {
             steps {
                 script {
@@ -271,6 +272,7 @@ pipeline {
                 }
             }
         }
+
         stage('Scan Frontend Image with Trivy') {
             steps {
                 script {
@@ -306,65 +308,112 @@ pipeline {
                 }
             }
         }
+
         stage('Cleanup Docker Images') {
-    steps {
-        script {
-            def backendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-            def frontendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-            // Remove backend images
-            sh """
-                docker rmi ${BACKEND_IMAGE}:${backendTag} || echo "Backend image ${backendTag} not found"
-                docker rmi ${BACKEND_IMAGE}:latest || echo "Backend latest image not found"
-            """
-            // Remove frontend images
-            sh """
-                docker rmi ${FRONTEND_IMAGE}:${frontendTag} || echo "Frontend image ${frontendTag} not found"
-                docker rmi ${FRONTEND_IMAGE}:latest || echo "Frontend latest image not found"
-            """
-            // Optional: clean up dangling images
-            sh 'docker image prune -f'
-        }
-    }
-}
-        stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    // Compose the image tag from Jenkins BUILD_NUMBER + short Git commit
-                    def imageTag = "${BUILD_NUMBER}-${GIT_COMMIT.take(7)}"
-
-                    withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
-                        // Apply manifests (create or update)
-                        sh """
-                            kubectl apply -f k8s-manifestes/backend-deployment.yaml
-                            kubectl apply -f k8s-manifestes/frontend-deployment.yaml
-
-                            # Update the container images inside the deployments
-                            kubectl set image deployment/nodejs-backend nodejs-backend=${BACKEND_IMAGE}:${imageTag} --record
-                            kubectl set image deployment/react-frontend react-frontend=${FRONTEND_IMAGE}:${imageTag} --record
-
-                            # Wait for rollout to finish
-                            kubectl rollout status deployment/nodejs-backend
-                            kubectl rollout status deployment/react-frontend
-                        """
-                    }
+                    def backendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                    def frontendTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                    // Remove backend images
+                    sh """
+                        docker rmi ${BACKEND_IMAGE}:${backendTag} || echo "Backend image ${backendTag} not found"
+                        docker rmi ${BACKEND_IMAGE}:latest || echo "Backend latest image not found"
+                    """
+                    // Remove frontend images
+                    sh """
+                        docker rmi ${FRONTEND_IMAGE}:${frontendTag} || echo "Frontend image ${frontendTag} not found"
+                        docker rmi ${FRONTEND_IMAGE}:latest || echo "Frontend latest image not found"
+                    """
+                    // Optional: clean up dangling images
+                    sh 'docker image prune -f'
                 }
             }
         }
     }
 
     post {
-        always {
-            script {
-                withEnv(["KUBECONFIG=${KUBECONFIG_FILE}"]) {
-                    sh 'kubectl get pods -n default'
-                }
-            }
-        }
         success {
-            echo '✅ Déploiement réussi !'
+            script {
+                def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+                emailext (
+                    subject: "✅ Pipeline SUCCESS - Build #${env.BUILD_NUMBER}",
+                    body: """
+                        <html>
+                        <body>
+                            <h2 style="color: green;">✅ Pipeline réussi!</h2>
+                            <p><strong>Projet:</strong> ${env.JOB_NAME}</p>
+                            <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
+                            <p><strong>Commit:</strong> ${env.GIT_COMMIT.take(7)}</p>
+                            <p><strong>Branch:</strong> ${env.GIT_BRANCH}</p>
+                            <p><strong>Durée:</strong> ${currentBuild.durationString}</p>
+                            <h3>Images Docker publiées:</h3>
+                            <ul>
+                                <li>Backend: ${BACKEND_IMAGE}:${imageTag}</li>
+                                <li>Frontend: ${FRONTEND_IMAGE}:${imageTag}</li>
+                            </ul>
+                            <p><strong>Note:</strong> ArgoCD Image Updater détectera automatiquement les nouvelles images.</p>
+                            <p><a href="${env.BUILD_URL}">Voir les détails du build</a></p>
+                        </body>
+                        </html>
+                    """,
+                    to: "${EMAIL_RECIPIENTS}",
+                    mimeType: 'text/html'
+                )
+            }
+            echo '✅ Pipeline réussi! Images pushées sur Docker Hub.'
+            echo '🔄 ArgoCD détectera automatiquement les nouvelles images.'
         }
+        
         failure {
-            echo '❌ Échec du déploiement.'
+            script {
+                emailext (
+                    subject: "❌ Pipeline FAILED - Build #${env.BUILD_NUMBER}",
+                    body: """
+                        <html>
+                        <body>
+                            <h2 style="color: red;">❌ Pipeline échoué!</h2>
+                            <p><strong>Projet:</strong> ${env.JOB_NAME}</p>
+                            <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
+                            <p><strong>Commit:</strong> ${env.GIT_COMMIT.take(7)}</p>
+                            <p><strong>Branch:</strong> ${env.GIT_BRANCH}</p>
+                            <p><strong>Durée:</strong> ${currentBuild.durationString}</p>
+                            <h3>Étape échouée:</h3>
+                            <p>${env.STAGE_NAME ?: 'Stage inconnu'}</p>
+                            <p><a href="${env.BUILD_URL}console">Voir les logs de la console</a></p>
+                            <p><a href="${env.BUILD_URL}">Voir les détails du build</a></p>
+                        </body>
+                        </html>
+                    """,
+                    to: "${EMAIL_RECIPIENTS}",
+                    mimeType: 'text/html'
+                )
+            }
+            echo '❌ Pipeline échoué.'
+        }
+        
+        unstable {
+            script {
+                emailext (
+                    subject: "⚠️ Pipeline UNSTABLE - Build #${env.BUILD_NUMBER}",
+                    body: """
+                        <html>
+                        <body>
+                            <h2 style="color: orange;">⚠️ Pipeline instable!</h2>
+                            <p><strong>Projet:</strong> ${env.JOB_NAME}</p>
+                            <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
+                            <p><strong>Commit:</strong> ${env.GIT_COMMIT.take(7)}</p>
+                            <p><strong>Branch:</strong> ${env.GIT_BRANCH}</p>
+                            <p><strong>Durée:</strong> ${currentBuild.durationString}</p>
+                            <p>Le build a réussi mais certains tests ont échoué ou des warnings ont été détectés.</p>
+                            <p><a href="${env.BUILD_URL}">Voir les détails du build</a></p>
+                        </body>
+                        </html>
+                    """,
+                    to: "${EMAIL_RECIPIENTS}",
+                    mimeType: 'text/html'
+                )
+            }
+            echo '⚠️ Pipeline instable - Certains tests ont échoué.'
         }
     }
-} 
+}
