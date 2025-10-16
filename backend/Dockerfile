@@ -8,7 +8,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # 📥 Installation des dépendances avec cache optimisé
-RUN npm ci --only=production --cache .npm --prefer-offline
+RUN npm ci --only=production --cache .npm --legacy-peer-deps --prefer-offline
+
 
 # 🗂️ Copie de tout le code source
 COPY . .
