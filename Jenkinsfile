@@ -12,7 +12,7 @@ pipeline {
         FRONTEND_IMAGE = "${DOCKER_HUB_REPO}-frontend"
         SONAR_TOKEN = credentials('sonar-token')
         // Email configuration
-        EMAIL_RECIPIENTS = 'yfiras.ayadi@tek-up.de' 
+        EMAIL_RECIPIENTS = 'firas.ayadi@tek-up.de' 
     }
 
     stages {
