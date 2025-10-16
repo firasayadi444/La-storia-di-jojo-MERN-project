@@ -175,7 +175,7 @@ pipeline {
                         sh '''
                             if [ -f package-lock.json ]; then
                                 echo "Using npm ci with existing package-lock.json"
-                                npm ci
+                                npm ci --legacy-peer-deps
                             else
                                 echo "No package-lock.json found, using npm install"
                                 npm install
