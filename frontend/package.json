@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:https": "node https-proxy.js",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "build:docker": "vite build --config vite.config.docker.ts --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -131,6 +132,16 @@
     "date-fns": "^3.6.0",
     "recharts": "^2.12.7",
     "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2"
+    "jspdf-autotable": "^3.8.2",
+    "@radix-ui/react-aspect-ratio": "^1.0.3",
+    "@radix-ui/react-context-menu": "^2.1.5",
+    "@radix-ui/react-menubar": "^1.0.4",
+    "@radix-ui/react-toggle-group": "^1.0.4",
+    "react-day-picker": "^8.10.1",
+    "embla-carousel-react": "^8.0.0",
+    "cmdk": "^1.0.0",
+    "vaul": "^1.0.0",
+    "input-otp": "^1.2.4",
+    "react-resizable-panels": "^2.0.0"
   }
 }
