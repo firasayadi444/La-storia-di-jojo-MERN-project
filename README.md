@@ -1,4 +1,4 @@
-# La Storia Di JoJo - MERN Food Delivery App
+# La Storia Di JoJo 
 
 A full-stack food delivery application built with the MERN stack (MongoDB, Express.js, React.js, Node.js) featuring admin management, delivery man applications, and customer ordering system.
 
