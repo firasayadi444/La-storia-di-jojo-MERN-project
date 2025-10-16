@@ -12,7 +12,7 @@ pipeline {
         FRONTEND_IMAGE = "${DOCKER_HUB_REPO}-frontend"
         SONAR_TOKEN = credentials('sonar-token')
         // Email configuration
-        EMAIL_RECIPIENTS = 'firas.ayadi2020@gmail.com' 
+        EMAIL_RECIPIENTS = 'yfiras.ayadi@tek-up.de' 
     }
 
     stages {
@@ -335,29 +335,24 @@ pipeline {
         success {
             script {
                 def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-                emailext (
-                    subject: "✅ Pipeline SUCCESS - Build #${env.BUILD_NUMBER}",
-                    body: """
-                        <html>
-                        <body>
-                            <h2 style="color: green;">✅ Pipeline réussi!</h2>
-                            <p><strong>Projet:</strong> ${env.JOB_NAME}</p>
-                            <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
-                            <p><strong>Commit:</strong> ${env.GIT_COMMIT.take(7)}</p>
-                            <p><strong>Branch:</strong> ${env.GIT_BRANCH}</p>
-                            <p><strong>Durée:</strong> ${currentBuild.durationString}</p>
-                            <h3>Images Docker publiées:</h3>
-                            <ul>
-                                <li>Backend: ${BACKEND_IMAGE}:${imageTag}</li>
-                                <li>Frontend: ${FRONTEND_IMAGE}:${imageTag}</li>
-                            </ul>
-                            <p><strong>Note:</strong> ArgoCD Image Updater détectera automatiquement les nouvelles images.</p>
-                            <p><a href="${env.BUILD_URL}">Voir les détails du build</a></p>
-                        </body>
-                        </html>
-                    """,
+                mail (
                     to: "${EMAIL_RECIPIENTS}",
-                    mimeType: 'text/html'
+                    subject: "✅ Pipeline SUCCESS - Build #${env.BUILD_NUMBER}",
+                    body: """Pipeline réussi!
+                    
+Projet: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Commit: ${env.GIT_COMMIT.take(7)}
+Branch: ${env.GIT_BRANCH}
+
+Images Docker publiées:
+- Backend: ${BACKEND_IMAGE}:${imageTag}
+- Frontend: ${FRONTEND_IMAGE}:${imageTag}
+
+ArgoCD détectera automatiquement les nouvelles images.
+
+Voir les détails: ${env.BUILD_URL}
+                    """
                 )
             }
             echo '✅ Pipeline réussi! Images pushées sur Docker Hub.'
@@ -366,26 +361,20 @@ pipeline {
         
         failure {
             script {
-                emailext (
-                    subject: "❌ Pipeline FAILED - Build #${env.BUILD_NUMBER}",
-                    body: """
-                        <html>
-                        <body>
-                            <h2 style="color: red;">❌ Pipeline échoué!</h2>
-                            <p><strong>Projet:</strong> ${env.JOB_NAME}</p>
-                            <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
-                            <p><strong>Commit:</strong> ${env.GIT_COMMIT.take(7)}</p>
-                            <p><strong>Branch:</strong> ${env.GIT_BRANCH}</p>
-                            <p><strong>Durée:</strong> ${currentBuild.durationString}</p>
-                            <h3>Étape échouée:</h3>
-                            <p>${env.STAGE_NAME ?: 'Stage inconnu'}</p>
-                            <p><a href="${env.BUILD_URL}console">Voir les logs de la console</a></p>
-                            <p><a href="${env.BUILD_URL}">Voir les détails du build</a></p>
-                        </body>
-                        </html>
-                    """,
+                mail (
                     to: "${EMAIL_RECIPIENTS}",
-                    mimeType: 'text/html'
+                    subject: "❌ Pipeline FAILED - Build #${env.BUILD_NUMBER}",
+                    body: """Pipeline échoué!
+                    
+Projet: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Commit: ${env.GIT_COMMIT.take(7)}
+Branch: ${env.GIT_BRANCH}
+Étape échouée: ${env.STAGE_NAME ?: 'Stage inconnu'}
+
+Voir les logs: ${env.BUILD_URL}console
+Voir les détails: ${env.BUILD_URL}
+                    """
                 )
             }
             echo '❌ Pipeline échoué.'
@@ -393,24 +382,20 @@ pipeline {
         
         unstable {
             script {
-                emailext (
-                    subject: "⚠️ Pipeline UNSTABLE - Build #${env.BUILD_NUMBER}",
-                    body: """
-                        <html>
-                        <body>
-                            <h2 style="color: orange;">⚠️ Pipeline instable!</h2>
-                            <p><strong>Projet:</strong> ${env.JOB_NAME}</p>
-                            <p><strong>Build:</strong> #${env.BUILD_NUMBER}</p>
-                            <p><strong>Commit:</strong> ${env.GIT_COMMIT.take(7)}</p>
-                            <p><strong>Branch:</strong> ${env.GIT_BRANCH}</p>
-                            <p><strong>Durée:</strong> ${currentBuild.durationString}</p>
-                            <p>Le build a réussi mais certains tests ont échoué ou des warnings ont été détectés.</p>
-                            <p><a href="${env.BUILD_URL}">Voir les détails du build</a></p>
-                        </body>
-                        </html>
-                    """,
+                mail (
                     to: "${EMAIL_RECIPIENTS}",
-                    mimeType: 'text/html'
+                    subject: "⚠️ Pipeline UNSTABLE - Build #${env.BUILD_NUMBER}",
+                    body: """Pipeline instable!
+                    
+Projet: ${env.JOB_NAME}
+Build: #${env.BUILD_NUMBER}
+Commit: ${env.GIT_COMMIT.take(7)}
+Branch: ${env.GIT_BRANCH}
+
+Le build a réussi mais certains tests ont échoué ou des warnings ont été détectés.
+
+Voir les détails: ${env.BUILD_URL}
+                    """
                 )
             }
             echo '⚠️ Pipeline instable - Certains tests ont échoué.'
