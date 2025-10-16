@@ -12,7 +12,7 @@ RUN npm ci --prefer-offline
 COPY . .
 
 # Build avec Vite (ignorer les erreurs TypeScript)
-RUN npm run build:docker
+RUN npm run build
 
 # Étape 2 : Servir le build avec Nginx
 FROM nginx:alpine
