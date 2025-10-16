@@ -537,6 +537,18 @@ class ApiService {
     return handleResponse<User>(response);
   }
 
+  async deleteAccount() {
+    const token = getAuthToken();
+    if (!token) throw new Error('Authentication required');
+    const response = await fetch(`${this.baseURL}/user/delete-account`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse<{ message: string }>(response);
+  }
+
   async addAddress(address: Address) {
     const token = getAuthToken();
     if (!token) throw new Error('Authentication required');
@@ -746,8 +758,6 @@ class ApiService {
     });
     return handleResponse<Payment>(response);
   }
-
-
 }
 
 // Export singleton instance

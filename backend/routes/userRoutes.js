@@ -8,5 +8,6 @@ router.delete("/users/:id", adminAuthMiddleware, userController.deleteUser);
 
 // User profile management
 router.put("/user/profile", authMiddleware, userController.updateProfile);
+router.delete("/user/delete-account", authMiddleware, userController.deleteAccount);
 
 module.exports = router;

@@ -5,8 +5,8 @@ const initDatabase = async () => {
   try {
     console.log("🔄 Initializing database...");
     
-    // Connect to database
-    await connectDatabase();
+    // Connect to database (non-async initializer)
+    connectDatabase();
     
     // Wait for connection to be ready
     await new Promise(resolve => {

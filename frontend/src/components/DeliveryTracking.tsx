@@ -19,19 +19,16 @@ import {
   Truck,
   Target,
   Route,
-  RefreshCw,
-  ExternalLink,
-  Play,
-  Pause,
-  Map,
-  Package,
-  Utensils
+  RefreshCw
 } from 'lucide-react';
 import { calculateDistance, formatDistance, calculateETA, formatTime } from '@/utils/distanceCalculator';
 import { io, Socket } from 'socket.io-client';
 import { Order } from '@/services/api';
-import GoogleMapsNavigation from './GoogleMapsNavigation';
 import { locationService, LocationData } from '@/services/locationService';
+import { getSmartRoute, getFallbackRoute, interpolateRoute, RouteResult } from '@/services/openRouteService';
+import { getOptimizedRoute, RoutePoint } from '@/services/optimizedRouteService';
+import { stabilizeLocation, StabilizedLocation } from '@/services/locationStabilizer';
+import { testRouteAPI } from '@/utils/routeTester';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default markers in react-leaflet
@@ -121,8 +118,11 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
   const [error, setError] = useState<string>('');
   const [isTracking, setIsTracking] = useState(false);
   const [mapError, setMapError] = useState<string>('');
-  const [trackingPaused, setTrackingPaused] = useState(false);
-  const [showGoogleMaps, setShowGoogleMaps] = useState(false);
+  const [routeData, setRouteData] = useState<RouteResult | null>(null);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const [animatedPosition, setAnimatedPosition] = useState<[number, number] | null>(null);
+  const [stabilizedLocation, setStabilizedLocation] = useState<StabilizedLocation | null>(null);
+  const animationRef = useRef<number | null>(null);
   const watchId = useRef<number | null>(null);
 
   // Restaurant location (fixed)
@@ -130,6 +130,149 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
   const customerLocation: [number, number] | null = order.customerLocation 
     ? [order.customerLocation.latitude, order.customerLocation.longitude]
     : null;
+
+  // Stabilize raw GPS location
+  const stabilizeRawLocation = async (rawLocation: LocationData) => {
+    try {
+      console.log('📍 Stabilizing raw GPS location:', rawLocation);
+      const stabilized = await stabilizeLocation(rawLocation, {
+        snapToRoad: true,
+        movingAverageWindow: 5,
+        noiseThresholdMeters: 10,
+        maxSnapDistanceMeters: 100
+      });
+      
+      setStabilizedLocation(stabilized);
+      console.log('✅ Location stabilized:', {
+        original: { lat: rawLocation.latitude, lng: rawLocation.longitude },
+        stabilized: { lat: stabilized.latitude, lng: stabilized.longitude },
+        isSnappedToRoad: stabilized.isSnappedToRoad
+      });
+      
+      return stabilized;
+    } catch (error) {
+      console.error('❌ Location stabilization failed:', error);
+      // Fallback to raw location
+      const fallbackStabilized: StabilizedLocation = {
+        latitude: rawLocation.latitude,
+        longitude: rawLocation.longitude,
+        accuracy: rawLocation.accuracy || 0,
+        timestamp: Date.now(),
+        isSnappedToRoad: false,
+        originalLocation: rawLocation
+      };
+      setStabilizedLocation(fallbackStabilized);
+      return fallbackStabilized;
+    }
+  };
+
+  // Test OpenRouteService API
+  const testRouteAPI = async () => {
+    console.log('🧪 Testing OpenRouteService API...');
+    await testRouteAPI();
+  };
+
+  // Fetch route using optimized OpenRouteService with debouncing and caching
+  const fetchRoute = async (start: RoutePoint, end: RoutePoint) => {
+    if (!customerLocation) return;
+    
+    setIsLoadingRoute(true);
+    try {
+      console.log('🗺️ Fetching optimized route from OpenRouteService...', {
+        start: { lat: start.lat, lng: start.lng },
+        end: { lat: end.lat, lng: end.lng }
+      });
+      
+      const route = await getOptimizedRoute(start, end, 'delivery', {
+        debounceMs: 1500, // 1.5 second debounce for delivery person
+        distanceThresholdMeters: 30, // 30 meters threshold for delivery
+        maxRetries: 3,
+        cacheTimeoutMs: 300000 // 5 minutes cache
+      });
+      
+      if (route && route.coordinates && route.coordinates.length > 0) {
+        setRouteData(route);
+        console.log('✅ Optimized route fetched successfully:', {
+          distance: `${(route.distance / 1000).toFixed(2)} km`,
+          duration: `${Math.round(route.duration / 60)} minutes`,
+          waypoints: route.coordinates.length,
+          firstPoint: route.coordinates[0],
+          lastPoint: route.coordinates[route.coordinates.length - 1]
+        });
+        
+        // Start marker animation if we have a current location
+        if (currentLocation) {
+          startMarkerAnimation(route, currentLocation);
+        }
+      } else {
+        console.warn('⚠️ Route fetch returned null or empty coordinates, using fallback');
+        const fallbackRoute = getFallbackRoute(start, end);
+        setRouteData(fallbackRoute);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching optimized route:', error);
+      const fallbackRoute = getFallbackRoute(start, end);
+      setRouteData(fallbackRoute);
+    } finally {
+      setIsLoadingRoute(false);
+    }
+  };
+
+  // Start marker animation along the route
+  const startMarkerAnimation = (route: RouteResult, startLocation: { latitude: number; longitude: number }) => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+
+    // Find the closest point on the route to the current location
+    const interpolatedRoute = interpolateRoute(route.coordinates, 100);
+    let closestIndex = 0;
+    let minDistance = Infinity;
+
+    interpolatedRoute.forEach((point, index) => {
+      const distance = calculateDistance(startLocation.latitude, startLocation.longitude, point[0], point[1]);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIndex = index;
+      }
+    });
+
+    // Animate from the closest point to the end
+    let currentIndex = closestIndex;
+    const animate = () => {
+      if (currentIndex < interpolatedRoute.length) {
+        setAnimatedPosition(interpolatedRoute[currentIndex]);
+        currentIndex++;
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    animate();
+  };
+
+  // Update route when stabilized location changes (DELIVERY PERSON PERSPECTIVE)
+  useEffect(() => {
+    if (stabilizedLocation && customerLocation && isOpen) {
+      console.log('🚚 DeliveryTracking: Fetching route from stabilized delivery person location to customer');
+      fetchRoute(
+        { lat: stabilizedLocation.latitude, lng: stabilizedLocation.longitude }, // FROM: Stabilized delivery person location
+        { lat: customerLocation[0], lng: customerLocation[1] }                   // TO: Customer location
+      );
+    }
+  }, [stabilizedLocation, customerLocation, isOpen]);
+
+  // Force initial route fetch when dialog opens
+  useEffect(() => {
+    if (isOpen && customerLocation) {
+      console.log('🚀 Force fetching initial route when dialog opens');
+      // Use restaurant location as fallback if no stabilized location yet
+      const startPoint = stabilizedLocation || { latitude: restaurantLocation[0], longitude: restaurantLocation[1] };
+      fetchRoute(
+        { lat: startPoint.latitude, lng: startPoint.longitude },
+        { lat: customerLocation[0], lng: customerLocation[1] }
+      );
+    }
+  }, [isOpen, customerLocation]);
 
   // Initialize current location and start automatic tracking
   useEffect(() => {
@@ -160,18 +303,31 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
             }
           }, 1000); // 1 second delay
           
-          // Then start continuous tracking
-          await locationService.startTracking((location: LocationData) => {
-            setCurrentLocation(location);
+          // Then start continuous tracking with stabilization
+          await locationService.startTracking(async (location: LocationData) => {
+            // Stabilize the raw GPS location
+            const stabilized = await stabilizeRawLocation(location);
+            
+            // Use stabilized location for display and updates
+            setCurrentLocation({
+              latitude: stabilized.latitude,
+              longitude: stabilized.longitude
+            });
             setLastUpdate(new Date());
             
-            // Emit socket event for real-time updates
+            // Emit socket event for real-time updates (use stabilized location)
             if (socket && isConnected) {
-              console.log('📤 Emitting auto-tracking location update for order:', order._id, location);
+              console.log('📤 Emitting stabilized location update for order:', order._id, stabilized);
               socket.emit('location-update', {
                 orderId: order._id,
-                location: location,
-                timestamp: new Date().toISOString()
+                location: {
+                  latitude: stabilized.latitude,
+                  longitude: stabilized.longitude,
+                  accuracy: stabilized.accuracy
+                },
+                timestamp: new Date().toISOString(),
+                isStabilized: true,
+                isSnappedToRoad: stabilized.isSnappedToRoad
               });
             } else {
               console.log('❌ Socket not connected for auto-tracking location update');
@@ -283,36 +439,14 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
     setIsTracking(false);
   };
 
-  // Pause/Resume location tracking
-  const toggleTracking = () => {
-    if (trackingPaused) {
-      // Resume tracking
-      setTrackingPaused(false);
-      if (!isTracking) {
-        startLocationTracking();
-      }
-    } else {
-      // Pause tracking
-      setTrackingPaused(true);
-      locationService.stopTracking();
-    }
-  };
-
-  // Get customer address for Google Maps
-  const getCustomerAddress = () => {
-    return order.deliveryAddress || 'Customer Location';
-  };
-
-  // Get restaurant address for Google Maps
-  const getRestaurantAddress = () => {
-    return 'Restaurant Location'; // You can make this dynamic based on your restaurant data
-  };
-
   // Cleanup on unmount and when dialog closes
   useEffect(() => {
     return () => {
       if (isTracking) {
         locationService.stopTracking();
+      }
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
     };
   }, [isTracking]);
@@ -360,6 +494,21 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
 
   // Get route polyline positions
   const getRoutePositions = (): [number, number][] => {
+    console.log('🔍 getRoutePositions called:', {
+      hasRouteData: !!routeData,
+      routeDataLength: routeData?.coordinates?.length || 0,
+      currentLocation,
+      customerLocation
+    });
+    
+    // Use real route data if available, otherwise fallback to straight line
+    if (routeData && routeData.coordinates && routeData.coordinates.length > 0) {
+      console.log('✅ Using real route data with', routeData.coordinates.length, 'coordinates');
+      return routeData.coordinates;
+    }
+    
+    // Fallback to straight line routing
+    console.log('⚠️ Using fallback straight line routing');
     const positions: [number, number][] = [restaurantLocation];
     if (currentLocation) {
       positions.push([currentLocation.latitude, currentLocation.longitude]);
@@ -367,6 +516,7 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
     if (customerLocation) {
       positions.push(customerLocation);
     }
+    console.log('📍 Fallback positions:', positions);
     return positions;
   };
 
@@ -398,18 +548,36 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl w-full h-[95vh] sm:h-[90vh] p-0">
-        <DialogHeader className="p-3 sm:p-4 border-b">
+      <DialogContent className="max-w-6xl w-full h-[90vh] p-0">
+        <DialogHeader className="p-4 border-b">
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Truck className="h-5 w-5 sm:h-6 sm:w-6 text-italian-green-600" />
-              <span className="hidden sm:inline">Delivery Tracking - Order #{order._id.slice(-8)}</span>
-              <span className="sm:hidden">Order #{order._id.slice(-8)}</span>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-6 w-6 text-italian-green-600" />
+              Delivery Person View - Order #{order._id.slice(-8)}
             </DialogTitle>
             <div className="flex items-center gap-2">
-              <Badge className={`${getStatusColor(order.status)} text-xs`}>
+              <Badge className={getStatusColor(order.status)}>
                 {order.status.replace('_', ' ').toUpperCase()}
               </Badge>
+              <Button variant="outline" size="sm" onClick={testRouteAPI} className="text-xs">
+                Test Route API
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  if (stabilizedLocation && customerLocation) {
+                    fetchRoute(
+                      { lat: stabilizedLocation.latitude, lng: stabilizedLocation.longitude },
+                      { lat: customerLocation[0], lng: customerLocation[1] }
+                    );
+                  }
+                }}
+                className="text-xs"
+                disabled={!stabilizedLocation || !customerLocation}
+              >
+                Refresh Route
+              </Button>
               <Button variant="outline" size="sm" onClick={onClose}>
                 <X className="h-4 w-4" />
               </Button>
@@ -435,9 +603,9 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col lg:flex-row">
+          <div className="flex-1 flex">
             {/* Map */}
-            <div className="flex-1 relative min-h-[300px] lg:min-h-0">
+            <div className="flex-1 relative">
               {mapError ? (
                 <div className="h-full w-full flex items-center justify-center bg-gray-100">
                   <div className="text-center p-8">
@@ -488,41 +656,82 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
                     </Marker>
                   )}
                   
-                  {/* Current Location Marker */}
-                  {currentLocation && (
-                    <Marker position={[currentLocation.latitude, currentLocation.longitude]} icon={deliveryIcon}>
+                  {/* Delivery Person Stabilized Location */}
+                  {stabilizedLocation && (
+                    <Marker position={[stabilizedLocation.latitude, stabilizedLocation.longitude]} icon={deliveryIcon}>
                       <div className="text-center">
-                        <div className="font-semibold">🚴 Your Location</div>
-                        <div className="text-sm text-gray-600">Current Position</div>
+                        <div className="font-semibold">🚚 Your Location</div>
+                        <div className="text-sm text-gray-600">Delivery Person</div>
+                        <div className="text-xs text-gray-500">
+                          {stabilizedLocation.isSnappedToRoad ? 'Road Snapped' : 'GPS Stabilized'}
+                        </div>
+                        {stabilizedLocation.accuracy > 0 && (
+                          <div className="text-xs text-blue-600">
+                            ±{Math.round(stabilizedLocation.accuracy)}m
+                          </div>
+                        )}
                       </div>
                     </Marker>
                   )}
                   
-                  {/* Route Polyline */}
+                  {/* Show original GPS location if different from stabilized */}
+                  {stabilizedLocation?.originalLocation && 
+                   (Math.abs(stabilizedLocation.latitude - stabilizedLocation.originalLocation.latitude) > 0.0001 ||
+                    Math.abs(stabilizedLocation.longitude - stabilizedLocation.originalLocation.longitude) > 0.0001) && (
+                    <Marker position={[stabilizedLocation.originalLocation.latitude, stabilizedLocation.originalLocation.longitude]} 
+                            icon={new L.Icon({
+                              iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png',
+                              shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                              iconSize: [20, 32],
+                              iconAnchor: [10, 32],
+                              popupAnchor: [1, -34],
+                              shadowSize: [32, 32]
+                            })}>
+                      <div className="text-center">
+                        <div className="font-semibold">📍 Raw GPS</div>
+                        <div className="text-xs text-gray-500">Original</div>
+                      </div>
+                    </Marker>
+                  )}
+                  
+                  {/* Animated Route Preview */}
+                  {animatedPosition && (
+                    <Marker position={animatedPosition} icon={deliveryIcon}>
+                      <div className="text-center">
+                        <div className="font-semibold">📍 Route Preview</div>
+                        <div className="text-sm text-gray-600">To Customer</div>
+                        <div className="text-xs text-gray-500">Following Roads</div>
+                      </div>
+                    </Marker>
+                  )}
+                  
+                  {/* Route Polyline (Delivery Person View) */}
                   {routePositions.length > 1 && (
                     <Polyline
                       positions={routePositions}
-                      color="#3b82f6"
-                      weight={4}
-                      opacity={0.8}
+                      color="#10b981"
+                      weight={5}
+                      opacity={0.9}
                     />
                   )}
                 </MapContainer>
               )}
 
-              {isLoading && (
+              {(isLoading || isLoadingRoute) && (
                 <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
                   <div className="flex items-center gap-2 bg-white p-4 rounded-lg shadow-lg">
                     <Loader2 className="h-5 w-5 animate-spin text-italian-green-600" />
-                    <span className="text-gray-700">Getting location...</span>
+                    <span className="text-gray-700">
+                      {isLoadingRoute ? 'Calculating route...' : 'Getting location...'}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Info Panel */}
-            <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l bg-gray-50 overflow-y-auto max-h-[400px] lg:max-h-none">
-              <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+            <div className="w-80 border-l bg-gray-50 overflow-y-auto">
+              <div className="p-4 space-y-4">
                 {/* Order Status */}
                 <Card>
                   <CardHeader className="pb-2">
@@ -534,10 +743,16 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
                   <CardContent className="pt-0">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Status:</span>
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status.replace('_', ' ').toUpperCase()}
-                        </Badge>
+                      <span className="text-gray-600">Status:</span>
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">View:</span>
+                      <Badge className="bg-green-100 text-green-800">
+                        DELIVERY PERSON
+                      </Badge>
                       </div>
                       {order.estimatedDeliveryTime && (
                         <div className="flex justify-between text-sm">
@@ -548,6 +763,54 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
                     </div>
                   </CardContent>
                 </Card>
+
+
+                {/* Location Stabilization Info */}
+                {stabilizedLocation && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Target className="h-4 w-4" />
+                        Location Stabilization
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Status:</span>
+                          <Badge className={stabilizedLocation.isSnappedToRoad ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}>
+                            {stabilizedLocation.isSnappedToRoad ? "Road Snapped" : "GPS Stabilized"}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Accuracy:</span>
+                          <span className="font-medium">
+                            {stabilizedLocation.accuracy > 0 ? `±${Math.round(stabilizedLocation.accuracy)}m` : 'Unknown'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Last Update:</span>
+                          <span className="font-medium">
+                            {new Date(stabilizedLocation.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        {stabilizedLocation.originalLocation && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Correction:</span>
+                            <span className="font-medium text-green-600">
+                              {Math.round(calculateDistance(
+                                stabilizedLocation.latitude,
+                                stabilizedLocation.longitude,
+                                stabilizedLocation.originalLocation.latitude,
+                                stabilizedLocation.originalLocation.longitude
+                              ))}m
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Customer Information */}
                 <Card>
@@ -581,147 +844,12 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
                   </CardContent>
                 </Card>
 
-                {/* Location Tracking Controls */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Navigation className="h-4 w-4" />
-                      Location Tracking
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Status:</span>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${isTracking && !trackingPaused ? 'bg-green-500' : 'bg-gray-400'}`} />
-                          <span className="text-xs">
-                            {isTracking && !trackingPaused ? 'Active' : trackingPaused ? 'Paused' : 'Inactive'}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        {!isTracking ? (
-                          <Button
-                            size="sm"
-                            onClick={startLocationTracking}
-                            disabled={isLoading}
-                            className="flex-1"
-                          >
-                            <Play className="h-3 w-3 mr-1" />
-                            Start Tracking
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant={trackingPaused ? "default" : "outline"}
-                            onClick={toggleTracking}
-                            className="flex-1"
-                          >
-                            {trackingPaused ? (
-                              <>
-                                <Play className="h-3 w-3 mr-1" />
-                                Resume
-                              </>
-                            ) : (
-                              <>
-                                <Pause className="h-3 w-3 mr-1" />
-                                Pause
-                              </>
-                            )}
-                          </Button>
-                        )}
-                        
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={getCurrentLocation}
-                          disabled={isLoading}
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      
-                      {isTracking && (
-                        <div className="text-xs text-gray-500">
-                          Location updates every 30 seconds
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Google Maps Navigation */}
-                {currentLocation && customerLocation && (
-                  <Card className="border-blue-200 bg-blue-50">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2 text-blue-800">
-                        <Map className="h-4 w-4" />
-                        Navigation to Customer
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-3">
-                        {/* Customer Address Display */}
-                        <div className="bg-white rounded-lg p-3 border">
-                          <div className="flex items-start gap-2">
-                            <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900">Delivery Address:</p>
-                              <p className="text-sm text-gray-700 break-words">{getCustomerAddress()}</p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Navigation Component */}
-                        <GoogleMapsNavigation
-                          fromLocation={currentLocation}
-                          toLocation={customerLocation}
-                          fromAddress="Your Current Location"
-                          toAddress={getCustomerAddress()}
-                          className="text-xs"
-                        />
-                        
-                        {/* Quick Actions */}
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="flex-1 bg-blue-600 hover:bg-blue-700"
-                            onClick={() => {
-                              const url = `https://www.google.com/maps/dir/?api=1&destination=${customerLocation[0]},${customerLocation[1]}`;
-                              window.open(url, '_blank');
-                            }}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Quick Open
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const url = `tel:${order.user?.phone || ''}`;
-                              if (order.user?.phone) {
-                                window.open(url);
-                              }
-                            }}
-                            disabled={!order.user?.phone}
-                          >
-                            <Phone className="h-3 w-3 mr-1" />
-                            Call
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
                 {/* Delivery Progress */}
                 {canTrackDelivery && currentLocation && (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
-                        <Target className="h-4 w-4" />
+                        <Navigation className="h-4 w-4" />
                         Delivery Progress
                       </CardTitle>
                     </CardHeader>
@@ -739,119 +867,6 @@ const DeliveryTracking: React.FC<DeliveryTrackingProps> = ({ isOpen, onClose, or
                     </CardContent>
                   </Card>
                 )}
-
-                {/* Customer Information */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Customer Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <div>
-                          <p className="font-medium text-sm">{order.user?.name || 'Unknown Customer'}</p>
-                          <p className="text-xs text-gray-600">Customer Name</p>
-                        </div>
-                      </div>
-                      
-                      {order.user?.phone && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-500" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{order.user.phone}</p>
-                            <p className="text-xs text-gray-600">Phone Number</p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(`tel:${order.user.phone}`)}
-                            className="text-xs"
-                          >
-                            <Phone className="h-3 w-3 mr-1" />
-                            Call
-                          </Button>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium break-words">{getCustomerAddress()}</p>
-                          <p className="text-xs text-gray-600">Delivery Address</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Order Items Details */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Package className="h-4 w-4" />
-                      Order Items ({order.items?.length || 0})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      {order.items && order.items.length > 0 ? (
-                        order.items.map((item, index) => (
-                          <div key={item._id || index} className="border rounded-lg p-3 bg-gray-50">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-sm">{item.food?.name || 'Unknown Item'}</h4>
-                                <p className="text-xs text-gray-600 mb-1">{item.food?.category || 'No category'}</p>
-                                {item.food?.description && (
-                                  <p className="text-xs text-gray-500 mb-2">{item.food.description}</p>
-                                )}
-                                <div className="flex items-center gap-4 text-xs">
-                                  <span className="flex items-center gap-1">
-                                    <Utensils className="h-3 w-3" />
-                                    Qty: {item.quantity}
-                                  </span>
-                                  <span className="font-medium">
-                                    €{item.price?.toFixed(2) || '0.00'}
-                                  </span>
-                                </div>
-                              </div>
-                              {item.food?.image && (
-                                <img
-                                  src={item.food.image}
-                                  alt={item.food.name}
-                                  className="w-12 h-12 object-cover rounded-lg ml-3"
-                                  onError={(e) => {
-                                    e.currentTarget.src = `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=48&h=48&fit=crop`;
-                                  }}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-4 text-gray-500">
-                          <Package className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                          <p className="text-sm">No items found</p>
-                        </div>
-                      )}
-                      
-                      {/* Order Total */}
-                      {order.items && order.items.length > 0 && (
-                        <div className="border-t pt-3 mt-3">
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold text-sm">Order Total:</span>
-                            <span className="font-bold text-lg text-green-600">
-                              €{order.totalAmount?.toFixed(2) || '0.00'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
 
                 {/* Location Controls */}
                 <Card>

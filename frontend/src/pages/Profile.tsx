@@ -15,7 +15,9 @@ import {
   X, 
   Calendar,
   CheckCircle,
-  Shield
+  Shield,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 
@@ -25,6 +27,8 @@ const Profile: React.FC = () => {
   const [profile, setProfile] = useState({ name: '', email: '', phone: '', address: '' });
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -53,6 +57,34 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    try {
+      // Note: You'll need to implement this API endpoint in your backend
+      await apiService.deleteAccount();
+      
+      // Clear user data and redirect
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      toast({ 
+        title: 'Account Deleted', 
+        description: 'Your account has been permanently deleted.',
+        variant: 'destructive'
+      });
+      
+      // Redirect to home page
+      window.location.href = '/';
+    } catch (error: any) {
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to delete account', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -195,6 +227,80 @@ const Profile: React.FC = () => {
               <Button asChild className="bg-italian-green-600 hover:bg-italian-green-700">
                 <a href="/change-password">Change Password</a>
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Delete Account Section */}
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader>
+            <CardTitle className="flex items-center text-red-700">
+              <Trash2 className="h-5 w-5 mr-2" />
+              Delete Account
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-4 bg-red-100 rounded-lg border border-red-200">
+                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-red-800 mb-2">⚠️ Permanent Action</h4>
+                  <p className="text-sm text-red-700 mb-2">
+                    Deleting your account will permanently remove all your data, order history, and preferences. 
+                    This action cannot be undone.
+                  </p>
+                  <ul className="text-xs text-red-600 space-y-1">
+                    <li>• All your orders and order history will be deleted</li>
+                    <li>• Your profile information will be permanently removed</li>
+                    <li>• You will no longer be able to access this account</li>
+                  </ul>
+                </div>
+              </div>
+              
+              {!showDeleteConfirm ? (
+                <Button 
+                  variant="destructive" 
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete My Account
+                </Button>
+              ) : (
+                <div className="space-y-3 p-4 bg-white rounded-lg border border-red-200">
+                  <h4 className="font-semibold text-red-800">Are you absolutely sure?</h4>
+                  <p className="text-sm text-gray-600">
+                    Type <strong className="text-red-600">DELETE</strong> in the box below to confirm account deletion.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleDeleteAccount}
+                      disabled={deleteLoading}
+                      className="flex-1 bg-red-600 hover:bg-red-700"
+                    >
+                      {deleteLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Yes, Delete Account
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

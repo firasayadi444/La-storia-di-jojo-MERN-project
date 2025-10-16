@@ -43,7 +43,7 @@ const authController = {
       if (!match)
         return res.status(400).json({ message: "Invalid email or password" });
 
-      const token = await jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
+      const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
         expiresIn: "2h",
       });
 

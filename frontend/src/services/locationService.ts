@@ -19,7 +19,7 @@ class LocationService {
   private updateInterval: NodeJS.Timeout | null = null;
 
   /**
-   * Get current location using browser geolocation API with improved accuracy
+   * Get current location using browser geolocation API
    */
   async getCurrentLocation(): Promise<LocationData> {
     return new Promise((resolve, reject) => {
@@ -28,104 +28,25 @@ class LocationService {
         return;
       }
 
-      // First attempt with high accuracy
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const location: LocationData = {
+          resolve({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
             timestamp: new Date().toISOString()
-          };
-
-          // If accuracy is poor (>100m), try again with different settings
-          if (position.coords.accuracy > 100) {
-            console.warn('Poor location accuracy, attempting to improve...');
-            this.getCurrentLocationWithRetry()
-              .then(resolve)
-              .catch(() => resolve(location)); // Fallback to first result
-          } else {
-            resolve(location);
-          }
+          });
         },
         (error) => {
-          // If high accuracy fails, try with lower requirements
-          console.warn('High accuracy location failed, trying fallback...');
-          this.getCurrentLocationFallback()
-            .then(resolve)
-            .catch(() => reject(new Error(this.getErrorMessage(error))));
+          reject(new Error(`Error getting location: ${error.message}`));
         },
         {
           enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 30000
-        }
-      );
-    });
-  }
-
-  /**
-   * Retry location with different settings for better accuracy
-   */
-  private async getCurrentLocationWithRetry(): Promise<LocationData> {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: new Date().toISOString()
-          });
-        },
-        (error) => reject(new Error(this.getErrorMessage(error))),
-        {
-          enableHighAccuracy: true,
-          timeout: 20000,
-          maximumAge: 0 // Force fresh location
-        }
-      );
-    });
-  }
-
-  /**
-   * Fallback location method with lower accuracy requirements
-   */
-  private async getCurrentLocationFallback(): Promise<LocationData> {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: new Date().toISOString()
-          });
-        },
-        (error) => reject(new Error(this.getErrorMessage(error))),
-        {
-          enableHighAccuracy: false,
           timeout: 10000,
-          maximumAge: 300000 // Accept location up to 5 minutes old
+          maximumAge: 60000
         }
       );
     });
-  }
-
-  /**
-   * Get user-friendly error messages
-   */
-  private getErrorMessage(error: GeolocationPositionError): string {
-    switch (error.code) {
-      case error.PERMISSION_DENIED:
-        return 'Location access denied. Please enable location permissions in your browser settings.';
-      case error.POSITION_UNAVAILABLE:
-        return 'Location information is unavailable. Please check your GPS and internet connection.';
-      case error.TIMEOUT:
-        return 'Location request timed out. Please try again.';
-      default:
-        return 'An unknown error occurred while retrieving location.';
-    }
   }
 
   /**
@@ -163,7 +84,7 @@ class LocationService {
   }
 
   /**
-   * Start continuous location tracking with improved real-time updates
+   * Start continuous location tracking
    */
   startTracking(onLocationUpdate?: (location: LocationData) => void): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -193,7 +114,7 @@ class LocationService {
         })
         .catch(reject);
 
-      // Start watching position with optimized settings
+      // Start watching position
       this.watchId = navigator.geolocation.watchPosition(
         async (position) => {
           const location: LocationData = {
@@ -212,26 +133,25 @@ class LocationService {
         },
         (error) => {
           console.error('Error tracking location:', error);
-          // Don't stop tracking on individual errors, keep trying
+          this.stopTracking();
         },
         {
           enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 10000 // Accept location up to 10 seconds old
+          timeout: 10000,
+          maximumAge: 30000
         }
       );
 
-      // Update location every 30 seconds as requested for delivery tracking
+      // Also update location every 15 seconds as backup for better real-time tracking
       this.updateInterval = setInterval(async () => {
         try {
           const location = await this.getCurrentLocation();
           await this.updateLocation(location);
           onLocationUpdate?.(location);
-          console.log('📍 Periodic location update sent:', location);
         } catch (error) {
           console.error('Error in periodic location update:', error);
         }
-      }, 30000); // 30 seconds as requested
+      }, 15000);
     });
   }
 

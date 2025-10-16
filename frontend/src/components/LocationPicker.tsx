@@ -86,6 +86,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   const [permissionStatus, setPermissionStatus] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown');
   const [isRetrying, setIsRetrying] = useState(false);
   const [locationHistory, setLocationHistory] = useState<Array<{latitude: number, longitude: number, address: string, timestamp: string}>>([]);
+  const [locationStep, setLocationStep] = useState<'requesting' | 'processing' | 'geocoding' | 'saving'>('requesting');
 
   // Default center (Tunis, Tunisia)
   const defaultCenter: [number, number] = [36.8065, 10.1815];
@@ -154,19 +155,23 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     setIsLoading(true);
     setError('');
     setIsRetrying(false);
+    setLocationStep('requesting');
 
     try {
-      // Use the improved location service with better error handling
+      // Step 1: Request location permission and get coordinates
+      setLocationStep('processing');
       const location = await locationService.getCurrentLocation();
       setCurrentLocation(location);
       setSelectedLocation(location);
       
-      // Get address for current location
+      // Step 2: Get address for current location
+      setLocationStep('geocoding');
       const geocodeResult = await reverseGeocode(location.latitude, location.longitude);
       setAddress(geocodeResult.address);
       setAccuracy(geocodeResult.accuracy);
       
-      // Save to history
+      // Step 3: Save to history
+      setLocationStep('saving');
       saveToHistory({
         latitude: location.latitude,
         longitude: location.longitude,
@@ -203,6 +208,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       }
     } finally {
       setIsLoading(false);
+      setLocationStep('requesting');
     }
   };
 
@@ -286,7 +292,52 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative">
+          {/* Loading overlay for current location detection */}
+          {isLoading && step === 'method' && (
+            <div className="absolute inset-0 bg-white bg-opacity-95 z-50 flex items-center justify-center">
+              <div className="text-center p-6 max-w-md">
+                <Loader2 className="h-16 w-16 text-italian-green-600 mx-auto mb-4 animate-spin" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Detecting Your Location
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Please wait while we get your current position...
+                </p>
+                
+                {/* Progress steps */}
+                <div className="space-y-2 mb-4">
+                  <div className={`flex items-center gap-2 text-sm ${locationStep === 'requesting' ? 'text-italian-green-600 font-medium' : locationStep === 'processing' || locationStep === 'geocoding' || locationStep === 'saving' ? 'text-green-600' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${locationStep === 'requesting' ? 'bg-italian-green-600' : locationStep === 'processing' || locationStep === 'geocoding' || locationStep === 'saving' ? 'bg-green-600' : 'bg-gray-300'}`}></div>
+                    <span>Requesting location permission</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-sm ${locationStep === 'processing' ? 'text-italian-green-600 font-medium' : locationStep === 'geocoding' || locationStep === 'saving' ? 'text-green-600' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${locationStep === 'processing' ? 'bg-italian-green-600' : locationStep === 'geocoding' || locationStep === 'saving' ? 'bg-green-600' : 'bg-gray-300'}`}></div>
+                    <span>Getting GPS coordinates</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-sm ${locationStep === 'geocoding' ? 'text-italian-green-600 font-medium' : locationStep === 'saving' ? 'text-green-600' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${locationStep === 'geocoding' ? 'bg-italian-green-600' : locationStep === 'saving' ? 'bg-green-600' : 'bg-gray-300'}`}></div>
+                    <span>Converting to address</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-sm ${locationStep === 'saving' ? 'text-italian-green-600 font-medium' : 'text-gray-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${locationStep === 'saving' ? 'bg-italian-green-600' : 'bg-gray-300'}`}></div>
+                    <span>Saving location</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-center gap-2 text-sm text-italian-green-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>
+                    {locationStep === 'requesting' && 'Requesting permission...'}
+                    {locationStep === 'processing' && 'Processing GPS coordinates...'}
+                    {locationStep === 'geocoding' && 'Getting address...'}
+                    {locationStep === 'saving' && 'Saving location...'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {step === 'method' && (
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               <div className="text-center">
@@ -336,43 +387,63 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                   className={`cursor-pointer hover:shadow-lg transition-all duration-200 border-2 ${
                     permissionStatus === 'denied' 
                       ? 'border-red-200 bg-red-50' 
-                      : 'hover:border-italian-green-300'
-                  }`}
-                  onClick={permissionStatus === 'denied' ? undefined : handleUseCurrentLocation}
+                      : isLoading 
+                        ? 'border-italian-green-300 bg-italian-green-50' 
+                        : 'hover:border-italian-green-300'
+                  } ${isLoading ? 'cursor-wait' : ''}`}
+                  onClick={permissionStatus === 'denied' || isLoading ? undefined : handleUseCurrentLocation}
                 >
                   <CardContent className="p-4 sm:p-6 text-center">
                     <div className="flex flex-col items-center">
-                      {permissionStatus === 'denied' ? (
-                        <AlertCircle className="h-8 w-8 sm:h-12 sm:w-12 text-red-500 mx-auto mb-3 sm:mb-4" />
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="h-8 w-8 sm:h-12 sm:w-12 text-italian-green-600 mx-auto mb-3 sm:mb-4 animate-spin" />
+                          <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                            Detecting Location...
+                          </h4>
+                          <p className="text-gray-600 text-xs sm:text-sm mb-3">
+                            Please wait while we get your current position
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-italian-green-600 font-medium">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Processing...</span>
+                          </div>
+                        </>
+                      ) : permissionStatus === 'denied' ? (
+                        <>
+                          <AlertCircle className="h-8 w-8 sm:h-12 sm:w-12 text-red-500 mx-auto mb-3 sm:mb-4" />
+                          <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                            Location Blocked
+                          </h4>
+                          <p className="text-gray-600 text-xs sm:text-sm mb-3">
+                            Enable location permissions in browser settings
+                          </p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open('chrome://settings/content/location', '_blank');
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Open Settings
+                          </Button>
+                        </>
                       ) : (
-                        <Navigation className="h-8 w-8 sm:h-12 sm:w-12 text-italian-green-600 mx-auto mb-3 sm:mb-4" />
-                      )}
-                      <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
-                        {permissionStatus === 'denied' ? 'Location Blocked' : 'Use Current Location'}
-                      </h4>
-                      <p className="text-gray-600 text-xs sm:text-sm mb-3">
-                        {permissionStatus === 'denied' 
-                          ? 'Enable location permissions in browser settings'
-                          : 'Automatically detect and save your current position'
-                        }
-                      </p>
-                      {permissionStatus === 'denied' ? (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open('chrome://settings/content/location', '_blank');
-                          }}
-                        >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          Open Settings
-                        </Button>
-                      ) : (
-                        <div className="text-xs text-italian-green-600 font-medium">
-                          ✨ Auto-save enabled
-                        </div>
+                        <>
+                          <Navigation className="h-8 w-8 sm:h-12 sm:w-12 text-italian-green-600 mx-auto mb-3 sm:mb-4" />
+                          <h4 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                            Use Current Location
+                          </h4>
+                          <p className="text-gray-600 text-xs sm:text-sm mb-3">
+                            Automatically detect and save your current position
+                          </p>
+                          <div className="text-xs text-italian-green-600 font-medium">
+                            ✨ Auto-save enabled
+                          </div>
+                        </>
                       )}
                     </div>
                   </CardContent>
@@ -446,8 +517,17 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                     className="text-xs sm:text-sm"
                     disabled={isLoading}
                   >
-                    <Navigation className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    My Location
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin" />
+                        Detecting...
+                      </>
+                    ) : (
+                      <>
+                        <Navigation className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        My Location
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

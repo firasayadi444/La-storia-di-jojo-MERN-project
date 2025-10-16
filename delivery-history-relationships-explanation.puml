@@ -1,0 +1,121 @@
+@startuml Delivery History Model Relationships
+
+title Delivery History Model - Relationships with Other Classes
+
+class User {
+  +_id: ObjectId
+  +name: String
+  +email: String
+  +role: String (user|admin|delivery)
+  +phone: String
+  +isAvailable: Boolean
+  +currentLocation: GeoJSON
+  +status: String
+  +vehicleType: String
+}
+
+class Order {
+  +_id: ObjectId
+  +user: ObjectId -> User
+  +items: Array<OrderItem>
+  +totalAmount: Number
+  +status: String
+  +deliveryAddress: String
+  +customerLocation: GeoLocation
+  +deliveryMan: ObjectId -> User
+  +deliveryRating: Number
+  +actualDeliveryTime: Date
+  +payment: ObjectId -> Payment
+}
+
+class DeliveryHistory {
+  +_id: ObjectId
+  +deliveryManId: ObjectId -> User
+  +orderId: ObjectId -> Order
+  +customerId: ObjectId -> User
+  +pickupLocation: GeoLocation
+  +deliveryLocation: GeoLocation
+  +routePoints: Array<RoutePoint>
+  +totalDistance: Number
+  +totalTime: Number
+  +averageSpeed: Number
+  +statusHistory: Array<StatusEntry>
+  +deliveryRating: Number
+  +deliveryNotes: String
+  +customerFeedback: String
+  +assignedAt: Date
+  +pickedUpAt: Date
+  +deliveredAt: Date
+  +completedAt: Date
+}
+
+class Payment {
+  +_id: ObjectId
+  +userId: ObjectId -> User
+  +orderId: ObjectId -> Order
+  +amount: Number
+  +paymentMethod: String
+  +paymentStatus: String
+}
+
+class Food {
+  +_id: ObjectId
+  +name: String
+  +category: String
+  +price: Number
+  +description: String
+  +image: String
+  +available: Boolean
+}
+
+' Direct Relationships
+DeliveryHistory ||--|| User : "deliveryManId\n(delivery person)"
+DeliveryHistory ||--|| User : "customerId\n(customer)"
+DeliveryHistory ||--|| Order : "orderId\n(tracks this order)"
+
+' Indirect Relationships through Order
+Order ||--|| User : "user\n(customer)"
+Order ||--o| User : "deliveryMan\n(delivery person)"
+Order ||--|| Payment : "payment"
+Order }o--|| Food : "items contain"
+
+' Relationship Explanations
+note top of DeliveryHistory : "**DeliveryHistory Model**\n\n**Purpose:** Analytics and tracking model\n**Role:** Performance monitoring and delivery optimization"
+
+note right of DeliveryHistory : "**Direct References:**\n\n1. **deliveryManId → User**\n   - References the delivery person\n   - Role must be 'delivery'\n   - Used for performance tracking\n\n2. **customerId → User**\n   - References the customer\n   - Role must be 'user'\n   - Used for customer satisfaction tracking\n\n3. **orderId → Order**\n   - References the original order\n   - One-to-one relationship\n   - Links business transaction to analytics"
+
+note bottom of DeliveryHistory : "**Indirect Relationships:**\n\nThrough Order model:\n• **Order.user → User** (customer)\n• **Order.deliveryMan → User** (delivery person)\n• **Order.payment → Payment** (financial data)\n• **Order.items → Food** (product data)\n\n**Why Indirect?**\n• Avoids data duplication\n• Maintains single source of truth\n• Follows normalization principles"
+
+note left of User : "**User Model Relationships:**\n\n**With DeliveryHistory:**\n• As deliveryManId: Performance tracking\n• As customerId: Satisfaction tracking\n\n**Business Rules:**\n• Same user can be both customer and delivery person\n• Delivery person must be 'active' status\n• Customer location used for delivery tracking"
+
+note right of Order : "**Order Model Relationships:**\n\n**With DeliveryHistory:**\n• One-to-one relationship\n• Order contains business data\n• DeliveryHistory contains analytics data\n\n**Separation of Concerns:**\n• Order: Business transactions\n• DeliveryHistory: Performance analytics"
+
+' Data Flow
+note as N1
+  **Data Flow and Relationships:**
+  
+  **1. Order Creation:**
+  User (customer) → Order → Payment
+  
+  **2. Delivery Assignment:**
+  Order → User (delivery person)
+  
+  **3. Delivery Tracking:**
+  Order → DeliveryHistory
+  User (delivery person) → DeliveryHistory
+  User (customer) → DeliveryHistory
+  
+  **4. Analytics Generation:**
+  DeliveryHistory aggregates data from:
+  • Order (business metrics)
+  • User (performance metrics)
+  • GPS tracking (route optimization)
+  
+  **Key Benefits:**
+  • Clean separation of concerns
+  • No circular dependencies
+  • Efficient data retrieval
+  • Scalable analytics
+end note
+
+@enduml

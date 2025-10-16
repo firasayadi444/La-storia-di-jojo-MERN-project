@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import ModernPaymentModal from '@/components/ModernPaymentModal';
 import LocationPicker from '@/components/LocationPicker';
 import { forceClearCart } from '@/utils/cartUtils';
-import { CheckCircle, CreditCard, Banknote, ArrowLeft, Shield, Clock, MapPin, User, Phone, Mail, Sparkles, Navigation } from 'lucide-react';
+import { CheckCircle, CreditCard, Banknote, ArrowLeft, Shield, Clock, MapPin, User, Phone, Mail, Sparkles, Navigation, MessageCircle } from 'lucide-react';
 
 const Checkout: React.FC = () => {
   const { items, getTotalPrice, clearCart } = useCart();
@@ -287,54 +287,68 @@ const Checkout: React.FC = () => {
 
           {/* Checkout Form */}
           <div className="lg:col-span-2">
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <User className="h-6 w-6 text-blue-600" />
-                  Delivery Information
+            <Card className="shadow-lg border-2 border-italian-green-100">
+              <CardHeader className="bg-gradient-to-r from-italian-green-50 to-blue-50 border-b border-italian-green-200">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="w-10 h-10 bg-gradient-to-r from-italian-green-500 to-blue-500 rounded-full flex items-center justify-center">
+                    <User className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <span className="text-gray-900">Delivery Information</span>
+                    <p className="text-sm font-normal text-gray-600 mt-1">Complete your delivery details</p>
+                  </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-6 bg-gradient-to-br from-white to-gray-50">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Personal Information */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="name" className="flex items-center gap-2 mb-2">
-                        <User className="h-4 w-4" />
-                        Full Name *
-                      </Label>
-                      <Input
-                        id="name"
-                        name="name"
-                        value={orderData.name}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full"
-                        placeholder="Enter your full name"
-                      />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Personal Details</h3>
                     </div>
                     
-                    <div>
-                      <Label htmlFor="email" className="flex items-center gap-2 mb-2">
-                        <Mail className="h-4 w-4" />
-                        Email *
-                      </Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={orderData.email}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full"
-                        placeholder="Enter your email"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                          <User className="h-4 w-4 text-gray-500" />
+                          Full Name *
+                        </Label>
+                        <Input
+                          id="name"
+                          name="name"
+                          value={orderData.name}
+                          onChange={handleInputChange}
+                          required
+                          className="w-full border-2 border-gray-200 focus:border-italian-green-500 focus:ring-2 focus:ring-italian-green-200 transition-all duration-200"
+                          placeholder="Enter your full name"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                          <Mail className="h-4 w-4 text-gray-500" />
+                          Email Address *
+                        </Label>
+                        <Input
+                          id="email"
+                          name="email"
+                          type="email"
+                          value={orderData.email}
+                          onChange={handleInputChange}
+                          required
+                          className="w-full border-2 border-gray-200 focus:border-italian-green-500 focus:ring-2 focus:ring-italian-green-200 transition-all duration-200"
+                          placeholder="Enter your email"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="phone" className="flex items-center gap-2 mb-2">
-                      <Phone className="h-4 w-4" />
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <Phone className="h-4 w-4 text-gray-500" />
                       Phone Number *
                     </Label>
                     <Input
@@ -344,108 +358,159 @@ const Checkout: React.FC = () => {
                       value={orderData.phone}
                       onChange={handleInputChange}
                       required
-                      className="w-full"
+                      className="w-full border-2 border-gray-200 focus:border-italian-green-500 focus:ring-2 focus:ring-italian-green-200 transition-all duration-200"
                       placeholder="Enter your phone number"
                     />
                   </div>
 
-                  <div>
-                    <Label className="flex items-center gap-2 mb-2">
-                      <MapPin className="h-4 w-4" />
-                      Delivery Location *
-                    </Label>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Delivery Location</h3>
+                    </div>
+                    
                     <div className="space-y-3">
                       {selectedLocation ? (
-                        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="flex items-center gap-2 text-sm text-green-700 mb-2">
-                            <MapPin className="h-4 w-4" />
-                            <span className="font-medium">Selected Location:</span>
+                        <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl shadow-sm">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                              <MapPin className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-green-800">Location Selected ✓</p>
+                              <p className="text-xs text-green-600">Ready for delivery</p>
+                            </div>
                           </div>
-                          <p className="text-green-600 mb-1">{selectedLocation.address}</p>
-                          <p className="text-xs text-green-500">
-                            Accuracy: ±{Math.round(selectedLocation.accuracy)}m
-                          </p>
+                          <div className="bg-white rounded-lg p-4 border border-green-100">
+                            <p className="text-green-700 font-medium mb-2">{selectedLocation.address}</p>
+                            <div className="flex items-center gap-4 text-xs text-green-600">
+                              <span className="flex items-center gap-1">
+                                <Navigation className="h-3 w-3" />
+                                ±{Math.round(selectedLocation.accuracy)}m accuracy
+                              </span>
+                            </div>
+                          </div>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => setShowLocationPicker(true)}
-                            className="mt-2 flex items-center gap-2"
+                            className="mt-3 flex items-center gap-2 border-green-300 text-green-700 hover:bg-green-100"
                           >
                             <Navigation className="h-4 w-4" />
                             Change Location
                           </Button>
                         </div>
                       ) : (
-                        <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center">
-                          <MapPin className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                          <p className="text-gray-600 mb-3">No delivery location selected</p>
+                        <div className="p-6 border-2 border-dashed border-gray-300 rounded-xl text-center bg-gray-50">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <MapPin className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <h4 className="text-lg font-semibold text-gray-900 mb-2">Select Delivery Location</h4>
+                          <p className="text-gray-600 mb-4">Choose where you want your order delivered</p>
                           <Button
                             type="button"
                             onClick={() => setShowLocationPicker(true)}
-                            className="bg-italian-green-600 hover:bg-italian-green-700 text-white"
+                            className="bg-italian-green-600 hover:bg-italian-green-700 text-white px-6 py-3 rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
                           >
-                            <Navigation className="h-4 w-4 mr-2" />
-                            Select Delivery Location
+                            <Navigation className="h-5 w-5 mr-2" />
+                            Choose Location
                           </Button>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="notes" className="mb-2">
-                      Delivery Notes (Optional)
-                    </Label>
-                    <textarea
-                      id="notes"
-                      name="notes"
-                      value={orderData.notes}
-                      onChange={handleInputChange}
-                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-italian-green-500 focus:border-transparent"
-                      rows={3}
-                      placeholder="Any special instructions for delivery..."
-                    />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <MessageCircle className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Special Instructions</h3>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="notes" className="text-sm font-medium text-gray-700">
+                        Delivery Notes (Optional)
+                      </Label>
+                      <textarea
+                        id="notes"
+                        name="notes"
+                        value={orderData.notes}
+                        onChange={handleInputChange}
+                        className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-italian-green-500 focus:ring-2 focus:ring-italian-green-200 transition-all duration-200 resize-none"
+                        rows={3}
+                        placeholder="Any special instructions for delivery... (e.g., 'Leave at door', 'Call when arriving', etc.)"
+                      />
+                    </div>
                   </div>
 
                   {/* Payment Method */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-green-600" />
-                      Payment Method
-                    </h3>
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <Shield className="h-4 w-4 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Payment Method</h3>
+                    </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
                           paymentMethod === 'card'
-                            ? 'border-italian-green-500 bg-italian-green-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-italian-green-500 bg-gradient-to-r from-italian-green-50 to-green-50 shadow-lg'
+                            : 'border-gray-200 hover:border-italian-green-300 hover:shadow-md bg-white'
                         }`}
                         onClick={() => setPaymentMethod('card')}
                       >
-                        <div className="flex items-center gap-3">
-                          <CreditCard className="h-6 w-6 text-blue-600" />
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                            paymentMethod === 'card' ? 'bg-italian-green-100' : 'bg-blue-100'
+                          }`}>
+                            <CreditCard className={`h-6 w-6 ${
+                              paymentMethod === 'card' ? 'text-italian-green-600' : 'text-blue-600'
+                            }`} />
+                          </div>
                           <div>
-                            <h4 className="font-medium text-gray-900">Credit/Debit Card</h4>
+                            <h4 className="font-semibold text-gray-900 mb-1">Credit/Debit Card</h4>
                             <p className="text-sm text-gray-600">Secure payment with Stripe</p>
+                            {paymentMethod === 'card' && (
+                              <div className="flex items-center gap-1 mt-2">
+                                <Shield className="h-3 w-3 text-italian-green-600" />
+                                <span className="text-xs text-italian-green-600 font-medium">Selected</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
                       
                       <div
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
                           paymentMethod === 'cash'
-                            ? 'border-italian-green-500 bg-italian-green-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-italian-green-500 bg-gradient-to-r from-italian-green-50 to-green-50 shadow-lg'
+                            : 'border-gray-200 hover:border-italian-green-300 hover:shadow-md bg-white'
                         }`}
                         onClick={() => setPaymentMethod('cash')}
                       >
-                        <div className="flex items-center gap-3">
-                          <Banknote className="h-6 w-6 text-green-600" />
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                            paymentMethod === 'cash' ? 'bg-italian-green-100' : 'bg-green-100'
+                          }`}>
+                            <Banknote className={`h-6 w-6 ${
+                              paymentMethod === 'cash' ? 'text-italian-green-600' : 'text-green-600'
+                            }`} />
+                          </div>
                           <div>
-                            <h4 className="font-medium text-gray-900">Cash on Delivery</h4>
+                            <h4 className="font-semibold text-gray-900 mb-1">Cash on Delivery</h4>
                             <p className="text-sm text-gray-600">Pay when your order arrives</p>
+                            {paymentMethod === 'cash' && (
+                              <div className="flex items-center gap-1 mt-2">
+                                <Shield className="h-3 w-3 text-italian-green-600" />
+                                <span className="text-xs text-italian-green-600 font-medium">Selected</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

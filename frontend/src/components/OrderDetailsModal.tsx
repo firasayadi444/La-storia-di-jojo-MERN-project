@@ -328,7 +328,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           </Card>
 
           {/* Delivery Information */}
-          {orderDetails.deliveryMan && orderDetails.deliveryMan._id && orderDetails.deliveryMan.name && (
+          {orderDetails.deliveryMan && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -363,39 +363,6 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-gray-500" />
                     <span className="text-sm">Assigné le: {formatDate(orderDetails.assignedAt)}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* No Delivery Man Assigned */}
-          {(!orderDetails.deliveryMan || !orderDetails.deliveryMan._id || !orderDetails.deliveryMan.name) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Truck className="h-5 w-5" />
-                  Informations Livraison
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2 text-amber-600">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-sm">Aucun livreur assigné pour le moment</span>
-                </div>
-                {orderDetails.status === 'ready' && (
-                  <div className="mt-2 text-xs text-gray-500">
-                    La commande est prête et en attente d'assignation d'un livreur
-                  </div>
-                )}
-                {orderDetails.status === 'preparing' && (
-                  <div className="mt-2 text-xs text-gray-500">
-                    La commande est en préparation
-                  </div>
-                )}
-                {orderDetails.status === 'pending' && (
-                  <div className="mt-2 text-xs text-gray-500">
-                    La commande est en attente de confirmation
                   </div>
                 )}
               </CardContent>

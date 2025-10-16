@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useSocket } from '../contexts/SocketContext';
+import { locationService } from '../services/locationService';
 import { 
   MapPin, 
   Clock, 
@@ -193,6 +194,28 @@ const DeliveryDashboard: React.FC = () => {
       
       if (newStatus === 'delivered' && deliveryNotes) {
         updateData.deliveryNotes = deliveryNotes;
+      }
+
+      // Capture current location when starting delivery
+      if (newStatus === 'out_for_delivery') {
+        try {
+          console.log('📍 Capturing current location for delivery start...');
+          const currentLocation = await locationService.getCurrentLocation();
+          updateData.deliveryStartLocation = {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            accuracy: currentLocation.accuracy,
+            timestamp: new Date().toISOString()
+          };
+          console.log('✅ Current location captured:', updateData.deliveryStartLocation);
+        } catch (locationError) {
+          console.warn('⚠️ Failed to capture current location:', locationError);
+          toast({
+            title: "Location Warning",
+            description: "Could not capture your current location. You can update it manually.",
+            variant: "destructive"
+          });
+        }
       }
 
       await apiService.updateOrderStatus(orderId, updateData);

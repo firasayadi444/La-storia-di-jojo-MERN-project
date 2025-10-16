@@ -1,0 +1,202 @@
+@startuml OrderApp Business Domain Class Diagram
+
+title OrderApp - Business Domain Class Diagram (Main Entities)
+
+!define ENTITY class
+!define VALUE_OBJECT class
+
+' Main Business Entities
+ENTITY User {
+  +_id: ObjectId
+  +name: String
+  +email: String
+  +password: String
+  +role: String (user|admin|delivery)
+  +address: String
+  +phone: String
+  +isAvailable: Boolean
+  +currentLocation: GeoJSON
+  +status: String (pending|active|rejected)
+  +vehicleType: String
+  +vehiclePhoto: String
+  +facePhoto: String
+  +cinPhoto: String
+  +mustChangePassword: Boolean
+  +createdAt: Date
+  +updatedAt: Date
+}
+
+ENTITY Food {
+  +_id: ObjectId
+  +name: String
+  +category: String
+  +price: Number
+  +description: String
+  +image: String
+  +available: Boolean
+  +createdAt: Date
+  +updatedAt: Date
+}
+
+ENTITY Order {
+  +_id: ObjectId
+  +user: ObjectId -> User
+  +items: Array<OrderItem>
+  +totalAmount: Number
+  +status: String (pending|confirmed|preparing|ready|out_for_delivery|delivered|cancelled)
+  +deliveryAddress: String
+  +customerLocation: GeoLocation
+  +deliveryMan: ObjectId -> User
+  +estimatedDeliveryTime: Date
+  +actualDeliveryTime: Date
+  +deliveryNotes: String
+  +deliveryRating: Number (1-5)
+  +foodRating: Number (1-5)
+  +feedbackComment: String
+  +assignedAt: Date
+  +cancelledAt: Date
+  +payment: ObjectId -> Payment
+  +createdAt: Date
+  +updatedAt: Date
+}
+
+ENTITY Payment {
+  +_id: ObjectId
+  +userId: ObjectId -> User
+  +orderId: ObjectId -> Order
+  +amount: Number
+  +paymentMethod: String (card|cash)
+  +paymentStatus: String (pending|paid|failed|refunded)
+  +stripePaymentId: String
+  +stripeChargeId: String
+  +stripePaymentIntentId: String
+  +paidAt: Date
+  +refundedAt: Date
+  +refundId: String
+  +refundReason: String
+  +createdAt: Date
+  +updatedAt: Date
+}
+
+ENTITY DeliveryHistory {
+  +_id: ObjectId
+  +deliveryManId: ObjectId -> User
+  +orderId: ObjectId -> Order
+  +customerId: ObjectId -> User
+  +pickupLocation: GeoLocation
+  +deliveryLocation: GeoLocation
+  +routePoints: Array<RoutePoint>
+  +totalDistance: Number (meters)
+  +totalTime: Number (minutes)
+  +averageSpeed: Number (km/h)
+  +statusHistory: Array<StatusEntry>
+  +deliveryRating: Number (1-5)
+  +deliveryNotes: String
+  +customerFeedback: String
+  +assignedAt: Date
+  +pickedUpAt: Date
+  +deliveredAt: Date
+  +completedAt: Date
+  +createdAt: Date
+  +updatedAt: Date
+}
+
+' Value Objects
+VALUE_OBJECT OrderItem {
+  +food: ObjectId -> Food
+  +quantity: Number
+  +price: Number
+}
+
+VALUE_OBJECT GeoLocation {
+  +latitude: Number
+  +longitude: Number
+  +accuracy: Number
+  +timestamp: Date
+}
+
+VALUE_OBJECT RoutePoint {
+  +latitude: Number
+  +longitude: Number
+  +timestamp: Date
+  +accuracy: Number
+  +speed: Number
+  +heading: Number
+}
+
+VALUE_OBJECT StatusEntry {
+  +status: String (assigned|picked_up|in_transit|delivered|failed)
+  +timestamp: Date
+  +location: GeoLocation
+  +notes: String
+}
+
+' Business Relationships (No Loops)
+User ||--o{ Order : "places"
+User ||--o{ Payment : "makes"
+User ||--o{ DeliveryHistory : "delivers"
+User ||--o{ DeliveryHistory : "receives"
+
+Order ||--o{ OrderItem : "contains"
+Order ||--|| Payment : "paid_by"
+Order ||--|| DeliveryHistory : "tracked_by"
+
+Food ||--o{ OrderItem : "referenced_in"
+
+' Role-based Relationships
+note top of User : "**User Roles:**\n• user: Customer\n• admin: System administrator\n• delivery: Delivery person"
+
+note right of Order : "**Order Lifecycle:**\npending → confirmed → preparing → ready → out_for_delivery → delivered"
+
+note bottom of Payment : "**Payment Methods:**\n• card: Stripe integration\n• cash: Cash on delivery"
+
+note left of DeliveryHistory : "**Analytics Model:**\n• Performance tracking\n• Route optimization\n• Customer satisfaction\n• Delivery metrics"
+
+' Business Rules
+note as N1
+  **Business Rules:**
+  
+  1. **User Management:**
+     - Users can have multiple roles
+     - Delivery persons need approval (status: pending/active/rejected)
+     - Only active delivery persons can receive orders
+  
+  2. **Order Processing:**
+     - Orders must have at least one item
+     - Total amount = sum of (item.price × item.quantity)
+     - Orders can be cancelled before delivery
+  
+  3. **Payment Processing:**
+     - One payment per order
+     - Payment status tracks transaction lifecycle
+     - Refunds supported for failed deliveries
+  
+  4. **Delivery Tracking:**
+     - One delivery history per order
+     - Real-time GPS tracking during delivery
+     - Performance metrics calculated automatically
+end note
+
+' Domain Boundaries
+package "Customer Domain" {
+  User
+  Order
+  OrderItem
+  Food
+}
+
+package "Payment Domain" {
+  Payment
+}
+
+package "Delivery Domain" {
+  DeliveryHistory
+  RoutePoint
+  StatusEntry
+}
+
+package "Location Domain" {
+  GeoLocation
+}
+
+@enduml

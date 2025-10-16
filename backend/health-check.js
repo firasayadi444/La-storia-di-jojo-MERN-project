@@ -5,8 +5,8 @@ const healthCheck = async () => {
   try {
     console.log("🏥 Running database health check...");
     
-    // Connect to database
-    await connectDatabase();
+    // Connect to database (non-async initializer)
+    connectDatabase();
     
     // Check connection
     if (mongoose.connection.readyState !== 1) {
